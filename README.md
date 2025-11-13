@@ -244,6 +244,35 @@ dotnet publish -c Release -o ./publish
 
 When running locally, the web interface will be available at **http://localhost:5000**
 
+### Running Tests
+
+The project includes comprehensive unit tests covering models, services, controllers, and logging.
+
+```bash
+# Run all tests
+dotnet test
+
+# Run tests with detailed output
+dotnet test --verbosity normal
+
+# Run tests with code coverage (requires coverlet.collector)
+dotnet test --collect:"XPlat Code Coverage"
+
+# Run tests in a specific project
+dotnet test ExchangeCalendarSync.Tests/ExchangeCalendarSync.Tests.csproj
+```
+
+**Test Coverage:**
+- **Models**: Configuration, calendar items, mailbox mappings
+- **Services**: Sync status, calendar sync, source routing
+- **Controllers**: API endpoints for sync and logs
+- **Logging**: In-memory log provider functionality
+
+**Test Frameworks:**
+- xUnit - Test framework
+- Moq - Mocking library
+- FluentAssertions - Assertion library
+
 ## How It Works
 
 1. **Initialization**: Connects to both Exchange 2019 (via EWS) and Exchange Online (via Microsoft Graph API)
@@ -385,7 +414,8 @@ ExchangeCalendarSync/
 │   └── SyncStatus.cs           # Sync status models
 ├── Services/
 │   ├── ExchangeOnPremiseService.cs  # EWS client
-│   ├── ExchangeOnlineService.cs     # Graph API client
+│   ├── ExchangeOnlineSourceService.cs  # Graph API source client
+│   ├── ExchangeOnlineService.cs     # Graph API destination client
 │   ├── CalendarSyncService.cs       # Sync orchestration
 │   ├── SyncStatusService.cs         # Status tracking
 │   └── SyncBackgroundService.cs     # Background sync service
@@ -396,9 +426,23 @@ ExchangeCalendarSync/
 ├── appsettings.json            # Configuration
 ├── Dockerfile                  # Docker image definition
 ├── docker-compose.yml          # Docker Compose configuration
+├── ExchangeCalendarSync.sln    # Solution file
 ├── .dockerignore               # Docker ignore patterns
 ├── .gitignore                  # Git ignore patterns
-└── README.md                   # This file
+├── README.md                   # This file
+└── ExchangeCalendarSync.Tests/ # Test project
+    ├── Controllers/
+    │   ├── LogsControllerTests.cs
+    │   └── SyncControllerTests.cs
+    ├── Logging/
+    │   └── InMemoryLoggerProviderTests.cs
+    ├── Models/
+    │   ├── AppSettingsTests.cs
+    │   └── CalendarItemSyncTests.cs
+    ├── Services/
+    │   ├── CalendarSyncServiceTests.cs
+    │   └── SyncStatusServiceTests.cs
+    └── ExchangeCalendarSync.Tests.csproj
 ```
 
 ## License
