@@ -49,12 +49,16 @@ public class ExchangeOnlineService
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
         }
 
+        // Use DestinationMailbox if set, otherwise fall back to SourceMailbox for backward compatibility
+        var targetMailbox = !string.IsNullOrEmpty(item.DestinationMailbox) ? item.DestinationMailbox : item.SourceMailbox;
+
         try
         {
-            _logger.LogInformation("Syncing calendar item '{Subject}' to {Mailbox}", item.Subject, item.SourceMailbox);
+            _logger.LogInformation("Syncing calendar item '{Subject}' from {Source} to {Destination}",
+                item.Subject, item.SourceMailbox, targetMailbox);
 
             // Check if item already exists
-            var existingEvent = await FindExistingEventAsync(item.SourceMailbox, item.Id);
+            var existingEvent = await FindExistingEventAsync(targetMailbox, item.Id);
 
             var graphEvent = new Event
             {
@@ -97,27 +101,27 @@ public class ExchangeOnlineService
             if (existingEvent != null)
             {
                 // Update existing event
-                await _graphClient.Users[item.SourceMailbox]
+                await _graphClient.Users[targetMailbox]
                     .Events[existingEvent.Id]
                     .PatchAsync(graphEvent);
 
-                _logger.LogInformation("Updated calendar item '{Subject}' for {Mailbox}", item.Subject, item.SourceMailbox);
+                _logger.LogInformation("Updated calendar item '{Subject}' for {Mailbox}", item.Subject, targetMailbox);
             }
             else
             {
                 // Create new event
-                await _graphClient.Users[item.SourceMailbox]
+                await _graphClient.Users[targetMailbox]
                     .Events
                     .PostAsync(graphEvent);
 
-                _logger.LogInformation("Created calendar item '{Subject}' for {Mailbox}", item.Subject, item.SourceMailbox);
+                _logger.LogInformation("Created calendar item '{Subject}' for {Mailbox}", item.Subject, targetMailbox);
             }
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to sync calendar item '{Subject}' to {Mailbox}", item.Subject, item.SourceMailbox);
+            _logger.LogError(ex, "Failed to sync calendar item '{Subject}' to {Mailbox}", item.Subject, targetMailbox);
             return false;
         }
     }

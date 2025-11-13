@@ -17,4 +17,5 @@ public class CalendarItemSync
     public string? RecurrencePattern { get; set; }
     public DateTime LastModified { get; set; }
     public string SourceMailbox { get; set; } = string.Empty;
+    public string DestinationMailbox { get; set; } = string.Empty;
 }

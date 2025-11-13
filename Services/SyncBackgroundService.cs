@@ -42,7 +42,7 @@ public class SyncBackgroundService : BackgroundService
                 {
                     try
                     {
-                        await _syncService.SyncAllMailboxesAsync(_onPremiseSettings.MailboxesToMonitor);
+                        await _syncService.SyncAllMailboxesAsync(_onPremiseSettings.GetMailboxMappings());
                     }
                     finally
                     {

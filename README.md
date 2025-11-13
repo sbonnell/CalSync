@@ -64,7 +64,11 @@ New-ManagementRoleAssignment -Name "ImpersonationAssignment" `
 
 ### 3. Configuration
 
-Edit `appsettings.json`:
+Edit `appsettings.json`. You have **two options** for configuring mailboxes:
+
+#### Option 1: Same email addresses (Simple)
+
+Use this when the source and destination mailboxes have the same email address:
 
 ```json
 {
@@ -89,6 +93,42 @@ Edit `appsettings.json`:
   }
 }
 ```
+
+#### Option 2: Different email addresses (Mailbox Mapping)
+
+Use this when source and destination have different email addresses (e.g., on-premise uses `@onpremise.local` and cloud uses `@cloud.com`):
+
+```json
+{
+  "ExchangeOnPremise": {
+    "ServerUrl": "https://exchange2019.yourdomain.com/EWS/Exchange.asmx",
+    "Username": "serviceaccount",
+    "Password": "your-password",
+    "Domain": "YOURDOMAIN",
+    "MailboxMappings": [
+      {
+        "SourceMailbox": "john.doe@onpremise.local",
+        "DestinationMailbox": "john.doe@cloud.com"
+      },
+      {
+        "SourceMailbox": "jane.smith@onpremise.local",
+        "DestinationMailbox": "jane.smith@cloud.com"
+      }
+    ]
+  },
+  "ExchangeOnline": {
+    "TenantId": "your-tenant-id",
+    "ClientId": "your-client-id",
+    "ClientSecret": "your-client-secret"
+  },
+  "Sync": {
+    "SyncIntervalMinutes": 5,
+    "LookbackDays": 30
+  }
+}
+```
+
+You can also use both options together if needed. The application will combine mailboxes from both `MailboxesToMonitor` and `MailboxMappings`.
 
 ## Running the Application
 

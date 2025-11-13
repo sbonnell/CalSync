@@ -77,7 +77,7 @@ class Program
         app.MapControllers();
 
         logger.LogInformation("Web interface available at http://localhost:5000");
-        logger.LogInformation("Monitoring {Count} mailboxes", appSettings.ExchangeOnPremise.MailboxesToMonitor.Count);
+        logger.LogInformation("Monitoring {Count} mailbox mappings", appSettings.ExchangeOnPremise.GetMailboxMappings().Count);
         logger.LogInformation("Sync interval: {Minutes} minutes", appSettings.Sync.SyncIntervalMinutes);
 
         await app.RunAsync();
@@ -96,8 +96,8 @@ class Program
         if (string.IsNullOrEmpty(settings.ExchangeOnPremise.Password))
             errors.Add("ExchangeOnPremise:Password is required");
 
-        if (!settings.ExchangeOnPremise.MailboxesToMonitor.Any())
-            errors.Add("ExchangeOnPremise:MailboxesToMonitor must contain at least one mailbox");
+        if (!settings.ExchangeOnPremise.MailboxesToMonitor.Any() && !settings.ExchangeOnPremise.MailboxMappings.Any())
+            errors.Add("ExchangeOnPremise:MailboxesToMonitor or MailboxMappings must contain at least one mailbox");
 
         if (string.IsNullOrEmpty(settings.ExchangeOnline.TenantId))
             errors.Add("ExchangeOnline:TenantId is required");

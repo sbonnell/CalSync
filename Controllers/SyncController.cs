@@ -56,7 +56,7 @@ public class SyncController : ControllerBase
             {
                 try
                 {
-                    await _syncService.SyncAllMailboxesAsync(_settings.MailboxesToMonitor);
+                    await _syncService.SyncAllMailboxesAsync(_settings.GetMailboxMappings());
                 }
                 catch (Exception ex)
                 {
