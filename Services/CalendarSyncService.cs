@@ -9,23 +9,27 @@ public class CalendarSyncService
     private readonly ExchangeOnPremiseService _onPremiseService;
     private readonly ExchangeOnlineService _onlineService;
     private readonly SyncSettings _settings;
+    private readonly SyncStatusService _statusService;
     private readonly Dictionary<string, DateTime> _lastSyncTimes;
 
     public CalendarSyncService(
         ILogger<CalendarSyncService> logger,
         ExchangeOnPremiseService onPremiseService,
         ExchangeOnlineService onlineService,
-        SyncSettings settings)
+        SyncSettings settings,
+        SyncStatusService statusService)
     {
         _logger = logger;
         _onPremiseService = onPremiseService;
         _onlineService = onlineService;
         _settings = settings;
+        _statusService = statusService;
         _lastSyncTimes = new Dictionary<string, DateTime>();
     }
 
     public async Task SyncAllMailboxesAsync(List<string> mailboxes)
     {
+        _statusService.StartSync();
         _logger.LogInformation("Starting sync for {Count} mailboxes", mailboxes.Count);
 
         foreach (var mailbox in mailboxes)
@@ -37,10 +41,12 @@ public class CalendarSyncService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to sync mailbox {Mailbox}", mailbox);
+                _statusService.UpdateMailboxStatus(mailbox, 0, 1, "Failed");
             }
         }
 
         _logger.LogInformation("Completed sync for all mailboxes");
+        _statusService.EndSync();
     }
 
     private async Task SyncMailboxAsync(string mailboxEmail)
@@ -48,6 +54,7 @@ public class CalendarSyncService
         try
         {
             _logger.LogInformation("Syncing mailbox: {Mailbox}", mailboxEmail);
+            _statusService.UpdateMailboxStatus(mailboxEmail, 0, 0, "Syncing");
 
             // Determine the date range to sync
             var endDate = DateTime.UtcNow.AddDays(30); // Look ahead 30 days
@@ -66,6 +73,7 @@ public class CalendarSyncService
             {
                 _logger.LogInformation("No calendar items to sync for {Mailbox}", mailboxEmail);
                 _lastSyncTimes[mailboxEmail] = DateTime.UtcNow;
+                _statusService.UpdateMailboxStatus(mailboxEmail, 0, 0, "Completed");
                 return;
             }
 
@@ -108,12 +116,15 @@ public class CalendarSyncService
                 "Sync completed for {Mailbox}: {Success} succeeded, {Failures} failed",
                 mailboxEmail, successCount, failureCount);
 
-            // Update last sync time
+            // Update last sync time and status
             _lastSyncTimes[mailboxEmail] = DateTime.UtcNow;
+            _statusService.UpdateMailboxStatus(mailboxEmail, successCount, failureCount,
+                failureCount > 0 ? "Completed with errors" : "Completed");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to sync mailbox {Mailbox}", mailboxEmail);
+            _statusService.UpdateMailboxStatus(mailboxEmail, 0, 1, "Failed");
             throw;
         }
     }

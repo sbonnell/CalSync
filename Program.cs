@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
 using ExchangeCalendarSync.Services;
+using ExchangeCalendarSync.Logging;
 
 namespace ExchangeCalendarSync;
 
@@ -11,89 +11,77 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        var host = CreateHostBuilder(args).Build();
+        var builder = WebApplication.CreateBuilder(args);
 
-        var logger = host.Services.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Exchange Calendar Sync Service starting...");
+        // Configuration
+        builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        builder.Configuration.AddEnvironmentVariables();
+
+        var appSettings = new AppSettings();
+        builder.Configuration.Bind(appSettings);
+
+        // Register settings
+        builder.Services.AddSingleton(appSettings.ExchangeOnPremise);
+        builder.Services.AddSingleton(appSettings.ExchangeOnline);
+        builder.Services.AddSingleton(appSettings.Sync);
+        builder.Services.AddSingleton(appSettings);
+
+        // Register in-memory log provider
+        var logProvider = new InMemoryLoggerProvider(maxLogCount: 1000);
+        builder.Services.AddSingleton(logProvider);
+
+        // Configure logging
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
+        builder.Logging.AddProvider(logProvider);
+
+        // Register services
+        builder.Services.AddSingleton<ExchangeOnPremiseService>();
+        builder.Services.AddSingleton<ExchangeOnlineService>();
+        builder.Services.AddSingleton<SyncStatusService>();
+        builder.Services.AddSingleton<CalendarSyncService>();
+
+        // Add background service for sync loop
+        builder.Services.AddHostedService<SyncBackgroundService>();
+
+        // Add controllers and web services
+        builder.Services.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
+
+        var app = builder.Build();
+
+        // Validate configuration
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        ValidateConfiguration(appSettings, logger);
+
+        // Initialize Exchange services
+        logger.LogInformation("Initializing Exchange services...");
+        var onPremiseService = app.Services.GetRequiredService<ExchangeOnPremiseService>();
+        var onlineService = app.Services.GetRequiredService<ExchangeOnlineService>();
 
         try
         {
-            var config = host.Services.GetRequiredService<IConfiguration>();
-            var appSettings = new AppSettings();
-            config.Bind(appSettings);
-
-            // Validate configuration
-            ValidateConfiguration(appSettings, logger);
-
-            // Initialize services
-            var onPremiseService = host.Services.GetRequiredService<ExchangeOnPremiseService>();
-            var onlineService = host.Services.GetRequiredService<ExchangeOnlineService>();
-            var syncService = host.Services.GetRequiredService<CalendarSyncService>();
-
-            logger.LogInformation("Initializing Exchange services...");
             onPremiseService.Initialize();
             onlineService.Initialize();
-
-            logger.LogInformation("Starting calendar sync loop...");
-            logger.LogInformation("Monitoring {Count} mailboxes", appSettings.ExchangeOnPremise.MailboxesToMonitor.Count);
-            logger.LogInformation("Sync interval: {Minutes} minutes", appSettings.Sync.SyncIntervalMinutes);
-
-            // Main sync loop
-            while (true)
-            {
-                try
-                {
-                    await syncService.SyncAllMailboxesAsync(appSettings.ExchangeOnPremise.MailboxesToMonitor);
-
-                    logger.LogInformation("Next sync in {Minutes} minutes", appSettings.Sync.SyncIntervalMinutes);
-                    await Task.Delay(TimeSpan.FromMinutes(appSettings.Sync.SyncIntervalMinutes));
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error during sync operation");
-                    logger.LogInformation("Retrying in 1 minute...");
-                    await Task.Delay(TimeSpan.FromMinutes(1));
-                }
-            }
+            logger.LogInformation("Exchange services initialized successfully");
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "Fatal error occurred. Service is shutting down.");
+            logger.LogError(ex, "Failed to initialize Exchange services");
             throw;
         }
+
+        // Configure HTTP pipeline
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+        app.MapControllers();
+
+        logger.LogInformation("Web interface available at http://localhost:5000");
+        logger.LogInformation("Monitoring {Count} mailboxes", appSettings.ExchangeOnPremise.MailboxesToMonitor.Count);
+        logger.LogInformation("Sync interval: {Minutes} minutes", appSettings.Sync.SyncIntervalMinutes);
+
+        await app.RunAsync();
     }
-
-    static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-                config.AddEnvironmentVariables();
-            })
-            .ConfigureServices((context, services) =>
-            {
-                var config = context.Configuration;
-
-                // Register settings
-                var appSettings = new AppSettings();
-                config.Bind(appSettings);
-
-                services.AddSingleton(appSettings.ExchangeOnPremise);
-                services.AddSingleton(appSettings.ExchangeOnline);
-                services.AddSingleton(appSettings.Sync);
-
-                // Register services
-                services.AddSingleton<ExchangeOnPremiseService>();
-                services.AddSingleton<ExchangeOnlineService>();
-                services.AddSingleton<CalendarSyncService>();
-
-                // Configure logging
-                services.AddLogging(builder =>
-                {
-                    builder.AddConsole();
-                    builder.AddConfiguration(config.GetSection("Logging"));
-                });
-            });
 
     static void ValidateConfiguration(AppSettings settings, ILogger logger)
     {

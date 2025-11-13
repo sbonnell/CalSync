@@ -12,8 +12,8 @@ COPY . ./
 # Build the application
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
-# Use the runtime image for the final container
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
+# Use the ASP.NET runtime image for the final container
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
 # Install any required system dependencies
@@ -26,6 +26,10 @@ COPY --from=build /app/publish .
 
 # Set environment variables
 ENV DOTNET_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:5000
+
+# Expose the web interface port
+EXPOSE 5000
 
 # Run the application
 ENTRYPOINT ["dotnet", "ExchangeCalendarSync.dll"]

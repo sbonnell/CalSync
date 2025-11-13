@@ -7,6 +7,11 @@ A C# application that runs in a Linux Docker container to synchronize calendar i
 - One-way calendar synchronization from Exchange 2019 to Exchange Online
 - Monitors multiple mailboxes simultaneously
 - Excludes attachments for security (attachments are never synced to Exchange Online)
+- **Web interface** for monitoring and control:
+  - Real-time sync status dashboard
+  - View recent logs with filtering
+  - Manual sync trigger
+  - Per-mailbox statistics
 - Runs in a Docker container on Linux
 - Configurable sync intervals
 - Comprehensive logging
@@ -100,6 +105,15 @@ docker-compose logs -f
 docker-compose down
 ```
 
+Once running, access the **web interface** at:
+- **http://localhost:5000**
+
+The web interface provides:
+- Real-time sync status and statistics
+- Recent logs with level filtering
+- Manual sync trigger button
+- Per-mailbox sync details
+
 ### Using Docker
 
 ```bash
@@ -109,6 +123,7 @@ docker build -t exchange-calendar-sync .
 # Run the container
 docker run -d \
   --name exchange-calendar-sync \
+  -p 5000:5000 \
   -v $(pwd)/appsettings.json:/app/appsettings.json:ro \
   --restart unless-stopped \
   exchange-calendar-sync
@@ -116,6 +131,8 @@ docker run -d \
 # View logs
 docker logs -f exchange-calendar-sync
 ```
+
+Access the web interface at **http://localhost:5000**
 
 ### Local Development
 
@@ -129,6 +146,8 @@ dotnet run
 # Build for release
 dotnet publish -c Release -o ./publish
 ```
+
+When running locally, the web interface will be available at **http://localhost:5000**
 
 ## How It Works
 
@@ -237,17 +256,46 @@ Logs are written to the console and captured by Docker. Log levels can be config
 └──────────────────┘         └──────────────────┘
 ```
 
+## Web Interface
+
+The application includes a built-in web dashboard accessible at **http://localhost:5000** that provides:
+
+### Features
+- **Status Dashboard**: Real-time sync status, total items synced, errors, and last sync time
+- **Manual Sync**: Trigger an immediate sync without waiting for the scheduled interval
+- **Mailbox Details**: Per-mailbox sync statistics including items synced, errors, and last sync time
+- **Live Logs**: View recent logs with filtering by level (Information, Warning, Error, Debug)
+- **Auto-refresh**: Dashboard and logs refresh automatically every 5 seconds
+
+### API Endpoints
+
+The web interface uses these REST API endpoints:
+
+- `GET /api/sync/status` - Get current sync status and statistics
+- `POST /api/sync/start` - Trigger a manual sync
+- `GET /api/logs?level={level}&limit={limit}` - Retrieve logs with optional filtering
+
 ## Project Structure
 
 ```
 ExchangeCalendarSync/
+├── Controllers/
+│   ├── SyncController.cs       # API endpoints for sync control
+│   └── LogsController.cs       # API endpoints for logs
+├── Logging/
+│   └── InMemoryLoggerProvider.cs  # In-memory log storage
 ├── Models/
 │   ├── AppSettings.cs          # Configuration models
-│   └── CalendarItem.cs         # Calendar item DTO
+│   ├── CalendarItem.cs         # Calendar item DTO
+│   └── SyncStatus.cs           # Sync status models
 ├── Services/
 │   ├── ExchangeOnPremiseService.cs  # EWS client
 │   ├── ExchangeOnlineService.cs     # Graph API client
-│   └── CalendarSyncService.cs       # Sync orchestration
+│   ├── CalendarSyncService.cs       # Sync orchestration
+│   ├── SyncStatusService.cs         # Status tracking
+│   └── SyncBackgroundService.cs     # Background sync service
+├── wwwroot/
+│   └── index.html              # Web dashboard UI
 ├── Program.cs                   # Application entry point
 ├── ExchangeCalendarSync.csproj # Project file
 ├── appsettings.json            # Configuration
