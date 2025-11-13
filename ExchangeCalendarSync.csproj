@@ -4,12 +4,30 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <DebugType>embedded</DebugType>
+    <PublishRepositoryUrl>false</PublishRepositoryUrl>
   </PropertyGroup>
+
+  <!-- Exclude test folder from SDK default item includes (tests live in a subfolder) -->
+  <ItemGroup>
+    <Compile Remove="ExchangeCalendarSync.Tests\**\*.cs" />
+    <None Remove="ExchangeCalendarSync.Tests\**\*.*" />
+    <EmbeddedResource Remove="ExchangeCalendarSync.Tests\**\*.*" />
+    <Content Remove="ExchangeCalendarSync.Tests\**\*.*" />
+  </ItemGroup>
+
+  <!-- Prevent copying test outputs -->
+  <Target Name="RemoveTestArtifacts" BeforeTargets="PrepareForBuild">
+    <ItemGroup>
+      <None Remove="@(None)" Condition="$([System.String]::Copy('%(FullPath)').Contains('ExchangeCalendarSync.Tests'))" />
+      <Content Remove="@(Content)" Condition="$([System.String]::Copy('%(FullPath)').Contains('ExchangeCalendarSync.Tests'))" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Exchange.WebServices" Version="2.2.0" />
     <PackageReference Include="Microsoft.Graph" Version="5.42.0" />
+    <PackageReference Include="Azure.Identity" Version="1.9.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.58.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />

@@ -47,7 +47,7 @@ public class ExchangeOnlineSourceService
         }
     }
 
-    public async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
+    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
     {
         if (_graphClient == null)
         {

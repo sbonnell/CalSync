@@ -30,7 +30,19 @@ public class InMemoryLoggerProvider : ILoggerProvider
 
     public IEnumerable<InMemoryLogEntry> GetLogs()
     {
-        return _logs.ToArray();
+        // Return most-recent-first
+        return _logs.ToArray().Reverse();
+    }
+
+    public IEnumerable<InMemoryLogEntry> GetLogs(LogLevel level)
+    {
+        return _logs.ToArray().Where(l => l.LogLevel == level).Reverse();
+    }
+
+    public IEnumerable<InMemoryLogEntry> GetLogs(int limit)
+    {
+        if (limit <= 0) return Enumerable.Empty<InMemoryLogEntry>();
+        return _logs.ToArray().Reverse().Take(limit);
     }
 
     public void Dispose()

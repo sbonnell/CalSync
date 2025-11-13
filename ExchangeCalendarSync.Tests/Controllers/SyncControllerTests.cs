@@ -108,8 +108,13 @@ public class SyncControllerTests
         // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
         var badResult = (BadRequestObjectResult)result;
-        var value = badResult.Value as dynamic;
-        ((string)value!.message).Should().Contain("already running");
+        badResult.Value.Should().NotBeNull();
+        // Extract message from anonymous object { message = "..." }
+        var objType = badResult.Value!.GetType();
+        var messageProp = objType.GetProperty("message");
+        messageProp.Should().NotBeNull();
+        var message = messageProp!.GetValue(badResult.Value) as string;
+        message.Should().Contain("already running");
     }
 
     [Fact]

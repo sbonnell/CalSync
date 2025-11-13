@@ -31,7 +31,7 @@ public class CalendarSyncService
     }
 
     // Legacy method for backward compatibility
-    public async Task SyncAllMailboxesAsync(List<string> mailboxes)
+    public virtual async Task SyncAllMailboxesAsync(List<string> mailboxes)
     {
         var mappings = mailboxes.Select(m => new MailboxMapping
         {
@@ -43,7 +43,7 @@ public class CalendarSyncService
         await SyncAllMailboxesAsync(mappings);
     }
 
-    public async Task SyncAllMailboxesAsync(List<MailboxMapping> mailboxMappings)
+    public virtual async Task SyncAllMailboxesAsync(List<MailboxMapping> mailboxMappings)
     {
         _statusService.StartSync();
         _logger.LogInformation("Starting sync for {Count} mailbox mappings", mailboxMappings.Count);

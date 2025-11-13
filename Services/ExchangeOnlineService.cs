@@ -42,7 +42,7 @@ public class ExchangeOnlineService
         }
     }
 
-    public async Task<bool> SyncCalendarItemAsync(CalendarItemSync item)
+    public virtual async Task<bool> SyncCalendarItemAsync(CalendarItemSync item)
     {
         if (_graphClient == null)
         {

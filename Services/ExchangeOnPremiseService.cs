@@ -41,7 +41,7 @@ public class ExchangeOnPremiseService
         }
     }
 
-    public async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
+    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
     {
         if (_service == null)
         {
@@ -58,7 +58,7 @@ public class ExchangeOnPremiseService
             // Impersonate the mailbox
             _service.ImpersonatedUserId = new ImpersonatedUserId(ConnectingIdType.SmtpAddress, mailboxEmail);
 
-            var calendar = await Folder.Bind(_service, WellKnownFolderName.Calendar);
+            var calendar = Folder.Bind(_service, WellKnownFolderName.Calendar);
 
             var calendarView = new CalendarView(startDate, endDate)
             {
@@ -80,7 +80,7 @@ public class ExchangeOnPremiseService
                 )
             };
 
-            var appointments = await _service.FindAppointments(WellKnownFolderName.Calendar, calendarView);
+            var appointments = _service.FindAppointments(WellKnownFolderName.Calendar, calendarView);
 
             foreach (var appointment in appointments.Items)
             {
@@ -91,8 +91,8 @@ public class ExchangeOnPremiseService
                         Id = appointment.Id.UniqueId,
                         Subject = appointment.Subject ?? string.Empty,
                         Body = appointment.Body?.Text,
-                        Start = appointment.Start,
-                        End = appointment.End,
+                        Start = appointment.Start is DateTime dStart ? dStart : DateTime.MinValue,
+                        End = appointment.End is DateTime dEnd ? dEnd : DateTime.MinValue,
                         Location = appointment.Location ?? string.Empty,
                         IsAllDay = appointment.IsAllDayEvent,
                         RequiredAttendees = appointment.RequiredAttendees.Select(a => a.Address).ToList(),

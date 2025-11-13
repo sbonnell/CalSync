@@ -55,11 +55,11 @@ public class InMemoryLoggerProviderTests
         // Assert
         var logs = provider.GetLogs().ToList();
         logs.Should().HaveCount(5);
-        logs[0].LogLevel.Should().Be(LogLevel.Debug);
-        logs[1].LogLevel.Should().Be(LogLevel.Information);
+        logs[0].LogLevel.Should().Be(LogLevel.Critical);
+        logs[1].LogLevel.Should().Be(LogLevel.Error);
         logs[2].LogLevel.Should().Be(LogLevel.Warning);
-        logs[3].LogLevel.Should().Be(LogLevel.Error);
-        logs[4].LogLevel.Should().Be(LogLevel.Critical);
+        logs[3].LogLevel.Should().Be(LogLevel.Information);
+        logs[4].LogLevel.Should().Be(LogLevel.Debug);
     }
 
     [Fact]
@@ -118,9 +118,9 @@ public class InMemoryLoggerProviderTests
         // Assert
         var logs = provider.GetLogs().ToList();
         logs.Should().HaveCount(maxCount);
-        // Should keep most recent logs
-        logs[0].Message.Should().Be("Message 5");
-        logs[4].Message.Should().Be("Message 9");
+        // Should keep most recent logs (most-recent-first)
+        logs[0].Message.Should().Be("Message 9");
+        logs[4].Message.Should().Be("Message 5");
     }
 
     [Fact]
