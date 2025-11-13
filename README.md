@@ -1,12 +1,18 @@
 # Exchange Calendar Sync
 
-A C# application that runs in a Linux Docker container to synchronize calendar items from on-premise Exchange 2019 mailboxes to Exchange Online (Microsoft 365). This is a one-way sync that excludes attachments for security purposes.
+A C# application that runs in a Linux Docker container to synchronize calendar items between Exchange environments. This is a one-way sync that excludes attachments for security purposes.
+
+**Flexible Source Options:**
+- Sync FROM Exchange 2019 (on-premise) via EWS
+- Sync FROM Exchange Online via Microsoft Graph API
+- Sync TO Exchange Online (destination)
 
 ## Features
 
-- One-way calendar synchronization from Exchange 2019 to Exchange Online
+- One-way calendar synchronization with flexible source options
+- Supports both Exchange 2019 (EWS) and Exchange Online (Graph API) as sources
 - Monitors multiple mailboxes simultaneously
-- Excludes attachments for security (attachments are never synced to Exchange Online)
+- Excludes attachments for security (attachments are never synced)
 - **Web interface** for monitoring and control:
   - Real-time sync status dashboard
   - View recent logs with filtering
@@ -20,16 +26,24 @@ A C# application that runs in a Linux Docker container to synchronize calendar i
 
 ## Prerequisites
 
-### Exchange 2019 (On-Premise)
+### Exchange 2019 (On-Premise) - Optional (if using as source)
 - Exchange Web Services (EWS) enabled
 - Service account with impersonation rights for monitored mailboxes
 - Network connectivity from Docker host to Exchange server
 
 ### Exchange Online (Microsoft 365)
+**For SOURCE (optional - if using Exchange Online as source):**
+- Azure AD App Registration with the following permissions:
+  - `Calendars.Read` or `Calendars.ReadWrite` (Application permission)
+  - Admin consent granted
+
+**For DESTINATION (always required):**
 - Azure AD App Registration with the following permissions:
   - `Calendars.ReadWrite` (Application permission)
   - Admin consent granted
 - Client ID, Client Secret, and Tenant ID
+
+**Note:** You can use the same Azure AD app for both source and destination if syncing within the same tenant, or separate apps for different tenants.
 
 ### Development/Runtime
 - Docker and Docker Compose
@@ -51,7 +65,7 @@ A C# application that runs in a Linux Docker container to synchronize calendar i
    - Add `Calendars.ReadWrite`
    - Click **Grant admin consent**
 
-### 2. Exchange 2019 Service Account
+### 2. Exchange 2019 Service Account (if using as source)
 
 Create a service account with impersonation rights:
 
@@ -64,11 +78,9 @@ New-ManagementRoleAssignment -Name "ImpersonationAssignment" `
 
 ### 3. Configuration
 
-Edit `appsettings.json`. You have **two options** for configuring mailboxes:
+Edit `appsettings.json` based on your source type:
 
-#### Option 1: Same email addresses (Simple)
-
-Use this when the source and destination mailboxes have the same email address:
+#### Scenario 1: Exchange 2019 → Exchange Online (Classic)
 
 ```json
 {
@@ -83,9 +95,9 @@ Use this when the source and destination mailboxes have the same email address:
     ]
   },
   "ExchangeOnline": {
-    "TenantId": "your-tenant-id",
-    "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret"
+    "TenantId": "destination-tenant-id",
+    "ClientId": "destination-client-id",
+    "ClientSecret": "destination-client-secret"
   },
   "Sync": {
     "SyncIntervalMinutes": 5,
@@ -94,9 +106,44 @@ Use this when the source and destination mailboxes have the same email address:
 }
 ```
 
-#### Option 2: Different email addresses (Mailbox Mapping)
+#### Scenario 2: Exchange Online → Exchange Online (Cross-Tenant)
 
-Use this when source and destination have different email addresses (e.g., on-premise uses `@onpremise.local` and cloud uses `@cloud.com`):
+```json
+{
+  "ExchangeOnPremise": {
+    "MailboxMappings": [
+      {
+        "SourceMailbox": "user1@sourcetenant.com",
+        "DestinationMailbox": "user1@desttenant.com",
+        "SourceType": "ExchangeOnline"
+      },
+      {
+        "SourceMailbox": "user2@sourcetenant.com",
+        "DestinationMailbox": "user2@desttenant.com",
+        "SourceType": "ExchangeOnline"
+      }
+    ]
+  },
+  "ExchangeOnlineSource": {
+    "TenantId": "source-tenant-id",
+    "ClientId": "source-client-id",
+    "ClientSecret": "source-client-secret"
+  },
+  "ExchangeOnline": {
+    "TenantId": "destination-tenant-id",
+    "ClientId": "destination-client-id",
+    "ClientSecret": "destination-client-secret"
+  },
+  "Sync": {
+    "SyncIntervalMinutes": 5,
+    "LookbackDays": 30
+  }
+}
+```
+
+#### Scenario 3: Mixed Sources (Advanced)
+
+You can mix Exchange 2019 and Exchange Online sources:
 
 ```json
 {
@@ -107,28 +154,36 @@ Use this when source and destination have different email addresses (e.g., on-pr
     "Domain": "YOURDOMAIN",
     "MailboxMappings": [
       {
-        "SourceMailbox": "john.doe@onpremise.local",
-        "DestinationMailbox": "john.doe@cloud.com"
+        "SourceMailbox": "onprem.user@company.local",
+        "DestinationMailbox": "onprem.user@cloud.com",
+        "SourceType": "ExchangeOnPremise"
       },
       {
-        "SourceMailbox": "jane.smith@onpremise.local",
-        "DestinationMailbox": "jane.smith@cloud.com"
+        "SourceMailbox": "cloud.user@tenant1.com",
+        "DestinationMailbox": "cloud.user@tenant2.com",
+        "SourceType": "ExchangeOnline"
       }
     ]
   },
-  "ExchangeOnline": {
-    "TenantId": "your-tenant-id",
-    "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret"
+  "ExchangeOnlineSource": {
+    "TenantId": "source-tenant-id",
+    "ClientId": "source-client-id",
+    "ClientSecret": "source-client-secret"
   },
-  "Sync": {
-    "SyncIntervalMinutes": 5,
-    "LookbackDays": 30
+  "ExchangeOnline": {
+    "TenantId": "destination-tenant-id",
+    "ClientId": "destination-client-id",
+    "ClientSecret": "destination-client-secret"
   }
 }
 ```
 
-You can also use both options together if needed. The application will combine mailboxes from both `MailboxesToMonitor` and `MailboxMappings`.
+**Configuration Notes:**
+- `SourceType` can be `ExchangeOnPremise` (EWS) or `ExchangeOnline` (Graph API)
+- `MailboxesToMonitor` defaults to `ExchangeOnPremise` source type
+- Only configure `ExchangeOnPremise` credentials if using Exchange 2019 as source
+- Only configure `ExchangeOnlineSource` if using Exchange Online as source
+- `ExchangeOnline` (destination) is always required
 
 ## Running the Application
 

@@ -23,6 +23,7 @@ class Program
         // Register settings
         builder.Services.AddSingleton(appSettings.ExchangeOnPremise);
         builder.Services.AddSingleton(appSettings.ExchangeOnline);
+        builder.Services.AddSingleton(appSettings.ExchangeOnlineSource); // Can be null
         builder.Services.AddSingleton(appSettings.Sync);
         builder.Services.AddSingleton(appSettings);
 
@@ -37,6 +38,7 @@ class Program
 
         // Register services
         builder.Services.AddSingleton<ExchangeOnPremiseService>();
+        builder.Services.AddSingleton<ExchangeOnlineSourceService>();
         builder.Services.AddSingleton<ExchangeOnlineService>();
         builder.Services.AddSingleton<SyncStatusService>();
         builder.Services.AddSingleton<CalendarSyncService>();
@@ -57,13 +59,33 @@ class Program
         // Initialize Exchange services
         logger.LogInformation("Initializing Exchange services...");
         var onPremiseService = app.Services.GetRequiredService<ExchangeOnPremiseService>();
+        var onlineSourceService = app.Services.GetRequiredService<ExchangeOnlineSourceService>();
         var onlineService = app.Services.GetRequiredService<ExchangeOnlineService>();
 
         try
         {
-            onPremiseService.Initialize();
+            // Check which source types are being used
+            var mappings = appSettings.ExchangeOnPremise.GetMailboxMappings();
+            var hasOnPremiseSource = mappings.Any(m => m.SourceType == SourceType.ExchangeOnPremise);
+            var hasOnlineSource = mappings.Any(m => m.SourceType == SourceType.ExchangeOnline);
+
+            // Initialize on-premise service if needed
+            if (hasOnPremiseSource)
+            {
+                onPremiseService.Initialize();
+                logger.LogInformation("Exchange On-Premise (EWS) service initialized");
+            }
+
+            // Initialize online source service if needed
+            if (hasOnlineSource)
+            {
+                onlineSourceService.Initialize();
+                logger.LogInformation("Exchange Online Source (Graph) service initialized");
+            }
+
+            // Always initialize destination service (Exchange Online)
             onlineService.Initialize();
-            logger.LogInformation("Exchange services initialized successfully");
+            logger.LogInformation("Exchange Online Destination service initialized");
         }
         catch (Exception ex)
         {
@@ -86,27 +108,56 @@ class Program
     static void ValidateConfiguration(AppSettings settings, ILogger logger)
     {
         var errors = new List<string>();
+        var mappings = settings.ExchangeOnPremise.GetMailboxMappings();
 
-        if (string.IsNullOrEmpty(settings.ExchangeOnPremise.ServerUrl))
-            errors.Add("ExchangeOnPremise:ServerUrl is required");
+        // Check if any mailboxes are configured
+        if (!mappings.Any())
+            errors.Add("No mailboxes configured. Add mailboxes to MailboxesToMonitor or MailboxMappings");
 
-        if (string.IsNullOrEmpty(settings.ExchangeOnPremise.Username))
-            errors.Add("ExchangeOnPremise:Username is required");
+        // Check which source types are being used
+        var hasOnPremiseSource = mappings.Any(m => m.SourceType == SourceType.ExchangeOnPremise);
+        var hasOnlineSource = mappings.Any(m => m.SourceType == SourceType.ExchangeOnline);
 
-        if (string.IsNullOrEmpty(settings.ExchangeOnPremise.Password))
-            errors.Add("ExchangeOnPremise:Password is required");
+        // Validate Exchange On-Premise settings if used as source
+        if (hasOnPremiseSource)
+        {
+            if (string.IsNullOrEmpty(settings.ExchangeOnPremise.ServerUrl))
+                errors.Add("ExchangeOnPremise:ServerUrl is required when using Exchange On-Premise as source");
 
-        if (!settings.ExchangeOnPremise.MailboxesToMonitor.Any() && !settings.ExchangeOnPremise.MailboxMappings.Any())
-            errors.Add("ExchangeOnPremise:MailboxesToMonitor or MailboxMappings must contain at least one mailbox");
+            if (string.IsNullOrEmpty(settings.ExchangeOnPremise.Username))
+                errors.Add("ExchangeOnPremise:Username is required when using Exchange On-Premise as source");
 
+            if (string.IsNullOrEmpty(settings.ExchangeOnPremise.Password))
+                errors.Add("ExchangeOnPremise:Password is required when using Exchange On-Premise as source");
+        }
+
+        // Validate Exchange Online Source settings if used as source
+        if (hasOnlineSource)
+        {
+            if (settings.ExchangeOnlineSource == null)
+                errors.Add("ExchangeOnlineSource configuration is required when using Exchange Online as source");
+            else
+            {
+                if (string.IsNullOrEmpty(settings.ExchangeOnlineSource.TenantId))
+                    errors.Add("ExchangeOnlineSource:TenantId is required when using Exchange Online as source");
+
+                if (string.IsNullOrEmpty(settings.ExchangeOnlineSource.ClientId))
+                    errors.Add("ExchangeOnlineSource:ClientId is required when using Exchange Online as source");
+
+                if (string.IsNullOrEmpty(settings.ExchangeOnlineSource.ClientSecret))
+                    errors.Add("ExchangeOnlineSource:ClientSecret is required when using Exchange Online as source");
+            }
+        }
+
+        // Validate Exchange Online (destination) settings - always required
         if (string.IsNullOrEmpty(settings.ExchangeOnline.TenantId))
-            errors.Add("ExchangeOnline:TenantId is required");
+            errors.Add("ExchangeOnline:TenantId is required for destination");
 
         if (string.IsNullOrEmpty(settings.ExchangeOnline.ClientId))
-            errors.Add("ExchangeOnline:ClientId is required");
+            errors.Add("ExchangeOnline:ClientId is required for destination");
 
         if (string.IsNullOrEmpty(settings.ExchangeOnline.ClientSecret))
-            errors.Add("ExchangeOnline:ClientSecret is required");
+            errors.Add("ExchangeOnline:ClientSecret is required for destination");
 
         if (errors.Any())
         {
@@ -119,5 +170,11 @@ class Program
         }
 
         logger.LogInformation("Configuration validation passed");
+        logger.LogInformation("Source types configured: {Sources}",
+            string.Join(", ", new[]
+            {
+                hasOnPremiseSource ? "Exchange On-Premise (EWS)" : null,
+                hasOnlineSource ? "Exchange Online (Graph)" : null
+            }.Where(s => s != null)));
     }
 }

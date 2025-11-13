@@ -1,9 +1,16 @@
 namespace ExchangeCalendarSync.Models;
 
+public enum SourceType
+{
+    ExchangeOnPremise,  // Exchange 2019 via EWS
+    ExchangeOnline      // Exchange Online via Graph API
+}
+
 public class AppSettings
 {
     public ExchangeOnPremiseSettings ExchangeOnPremise { get; set; } = new();
     public ExchangeOnlineSettings ExchangeOnline { get; set; } = new();
+    public ExchangeOnlineSourceSettings? ExchangeOnlineSource { get; set; }
     public SyncSettings Sync { get; set; } = new();
 }
 
@@ -11,6 +18,7 @@ public class MailboxMapping
 {
     public string SourceMailbox { get; set; } = string.Empty;
     public string DestinationMailbox { get; set; } = string.Empty;
+    public SourceType SourceType { get; set; } = SourceType.ExchangeOnPremise;
 }
 
 public class ExchangeOnPremiseSettings
@@ -34,7 +42,7 @@ public class ExchangeOnPremiseSettings
         // Add explicit mappings from new format
         mappings.AddRange(MailboxMappings);
 
-        // Add legacy format mappings (where source == destination)
+        // Add legacy format mappings (where source == destination, from Exchange On-Premise)
         foreach (var mailbox in MailboxesToMonitor)
         {
             // Don't add duplicates
@@ -43,7 +51,8 @@ public class ExchangeOnPremiseSettings
                 mappings.Add(new MailboxMapping
                 {
                     SourceMailbox = mailbox,
-                    DestinationMailbox = mailbox
+                    DestinationMailbox = mailbox,
+                    SourceType = SourceType.ExchangeOnPremise
                 });
             }
         }
@@ -53,6 +62,14 @@ public class ExchangeOnPremiseSettings
 }
 
 public class ExchangeOnlineSettings
+{
+    public string TenantId { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+}
+
+// Settings for Exchange Online as a SOURCE (separate from destination)
+public class ExchangeOnlineSourceSettings
 {
     public string TenantId { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;
