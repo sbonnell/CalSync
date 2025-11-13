@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  exchange-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: exchange-calendar-sync
+    restart: unless-stopped
+    volumes:
+      - ./appsettings.json:/app/appsettings.json:ro
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - TZ=UTC
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
