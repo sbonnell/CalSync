@@ -388,7 +388,7 @@ The application includes a built-in web dashboard accessible at **http://localho
 - **Status Dashboard**: Real-time sync status, total items synced, errors, and last sync time
 - **Manual Sync**: Trigger an immediate sync without waiting for the scheduled interval
 - **Mailbox Details**: Per-mailbox sync statistics including items synced, errors, and last sync time
-- **Live Logs**: View recent logs with filtering by level (Information, Warning, Error, Debug)
+- **Live Logs**: View recent logs with minimum level filtering (shows selected level and more severe)
 - **Auto-refresh**: Dashboard and logs refresh automatically every 5 seconds
 
 ### API Endpoints
@@ -397,7 +397,7 @@ The web interface uses these REST API endpoints:
 
 - `GET /api/sync/status` - Get current sync status and statistics
 - `POST /api/sync/start` - Trigger a manual sync
-- `GET /api/logs?level={level}&limit={limit}` - Retrieve logs with optional filtering
+- `GET /api/logs?level={level}&limit={limit}` - Retrieve logs (level filters to minimum severity)
 
 ## Project Structure
 

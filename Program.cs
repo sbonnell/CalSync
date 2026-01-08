@@ -23,7 +23,8 @@ class Program
         // Register settings
         builder.Services.AddSingleton(appSettings.ExchangeOnPremise);
         builder.Services.AddSingleton(appSettings.ExchangeOnline);
-        builder.Services.AddSingleton(appSettings.ExchangeOnlineSource); // Can be null
+        if (appSettings.ExchangeOnlineSource != null)
+            builder.Services.AddSingleton(appSettings.ExchangeOnlineSource);
         builder.Services.AddSingleton(appSettings.Sync);
         builder.Services.AddSingleton(appSettings);
 

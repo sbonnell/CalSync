@@ -41,7 +41,7 @@ public class ExchangeOnPremiseService
         }
     }
 
-    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
+    public virtual Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
     {
         if (_service == null)
         {
@@ -123,6 +123,6 @@ public class ExchangeOnPremiseService
             throw;
         }
 
-        return items;
+        return System.Threading.Tasks.Task.FromResult(items);
     }
 }
