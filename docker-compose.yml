@@ -11,6 +11,8 @@ services:
       - "5000:5000"
     volumes:
       - ./appsettings.json:/app/appsettings.json:ro
+    env_file:
+      - .env
     environment:
       - DOTNET_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5000

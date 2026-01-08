@@ -311,13 +311,15 @@
         <div class="logs-section">
             <h2>Recent Logs</h2>
             <div class="logs-controls">
-                <label for="log-level">Filter by level:</label>
+                <label for="log-level">Minimum level:</label>
                 <select id="log-level" onchange="refreshLogs()">
                     <option value="">All Levels</option>
-                    <option value="Information" selected>Information</option>
-                    <option value="Warning">Warning</option>
-                    <option value="Error">Error</option>
-                    <option value="Debug">Debug</option>
+                    <option value="Trace">Trace+</option>
+                    <option value="Debug">Debug+</option>
+                    <option value="Information" selected>Info+</option>
+                    <option value="Warning">Warning+</option>
+                    <option value="Error">Error+</option>
+                    <option value="Critical">Critical</option>
                 </select>
                 <button class="btn btn-primary" onclick="refreshLogs()">Refresh Logs</button>
             </div>

@@ -19,12 +19,12 @@ public class LogsController : ControllerBase
     {
         var logs = _logProvider.GetLogs();
 
-        // Filter by log level if specified
+        // Filter by minimum log level if specified (includes selected level and more severe)
         if (!string.IsNullOrEmpty(level))
         {
-            if (Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(level, true, out var logLevel))
+            if (Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(level, true, out var minLevel))
             {
-                logs = logs.Where(l => l.LogLevel == logLevel);
+                logs = logs.Where(l => l.LogLevel >= minLevel);
             }
         }
 

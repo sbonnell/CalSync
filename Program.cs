@@ -47,7 +47,11 @@ class Program
         builder.Services.AddHostedService<SyncBackgroundService>();
 
         // Add controllers and web services
-        builder.Services.AddControllers();
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            });
         builder.Services.AddEndpointsApiExplorer();
 
         var app = builder.Build();

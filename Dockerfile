@@ -3,14 +3,14 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies
-COPY *.csproj ./
-RUN dotnet restore
+COPY ExchangeCalendarSync.csproj ./
+RUN dotnet restore ExchangeCalendarSync.csproj
 
-# Copy the rest of the application
+# Copy the rest of the application (excluding test project)
 COPY . ./
 
-# Build the application
-RUN dotnet publish -c Release -o /app/publish --no-restore
+# Build the application (explicitly target the project, not the solution)
+RUN dotnet publish ExchangeCalendarSync.csproj -c Release -o /app/publish --no-restore
 
 # Use the ASP.NET runtime image for the final container
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
