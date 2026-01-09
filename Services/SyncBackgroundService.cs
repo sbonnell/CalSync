@@ -7,15 +7,15 @@ namespace ExchangeCalendarSync.Services;
 public class SyncBackgroundService : BackgroundService
 {
     private readonly ILogger<SyncBackgroundService> _logger;
-    private readonly CalendarSyncService _syncService;
-    private readonly SyncStatusService _statusService;
+    private readonly ICalendarSyncService _syncService;
+    private readonly ISyncStatusService _statusService;
     private readonly ExchangeOnPremiseSettings _onPremiseSettings;
     private readonly SyncSettings _syncSettings;
 
     public SyncBackgroundService(
         ILogger<SyncBackgroundService> logger,
-        CalendarSyncService syncService,
-        SyncStatusService statusService,
+        ICalendarSyncService syncService,
+        ISyncStatusService statusService,
         ExchangeOnPremiseSettings onPremiseSettings,
         SyncSettings syncSettings)
     {

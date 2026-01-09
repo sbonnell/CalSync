@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ExchangeCalendarSync.Logging;
 
 namespace ExchangeCalendarSync.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("api")]
 public class LogsController : ControllerBase
 {
     private readonly InMemoryLoggerProvider _logProvider;

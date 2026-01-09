@@ -4,7 +4,7 @@ using ExchangeCalendarSync.Models;
 
 namespace ExchangeCalendarSync.Services;
 
-public class ExchangeOnPremiseService
+public class ExchangeOnPremiseService : ICalendarSourceService
 {
     private readonly ILogger<ExchangeOnPremiseService> _logger;
     private readonly ExchangeOnPremiseSettings _settings;

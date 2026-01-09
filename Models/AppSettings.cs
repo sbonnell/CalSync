@@ -12,6 +12,7 @@ public class AppSettings
     public ExchangeOnlineSettings ExchangeOnline { get; set; } = new();
     public ExchangeOnlineSourceSettings? ExchangeOnlineSource { get; set; }
     public SyncSettings Sync { get; set; } = new();
+    public PersistenceSettings Persistence { get; set; } = new();
 }
 
 public class MailboxMapping
@@ -80,4 +81,10 @@ public class SyncSettings
 {
     public int SyncIntervalMinutes { get; set; } = 5;
     public int LookbackDays { get; set; } = 30;
+}
+
+public class PersistenceSettings
+{
+    public string DataPath { get; set; } = "./data";
+    public bool EnableStatePersistence { get; set; } = true;
 }

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace ExchangeCalendarSync.Models;
 
 public class SyncStatus
@@ -5,7 +7,7 @@ public class SyncStatus
     public DateTime? LastSyncTime { get; set; }
     public DateTime? NextScheduledSync { get; set; }
     public bool IsRunning { get; set; }
-    public Dictionary<string, MailboxSyncStatus> MailboxStatuses { get; set; } = new();
+    public IDictionary<string, MailboxSyncStatus> MailboxStatuses { get; set; } = new ConcurrentDictionary<string, MailboxSyncStatus>();
     public int TotalItemsSynced { get; set; }
     public int TotalErrors { get; set; }
 }

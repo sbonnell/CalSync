@@ -13,6 +13,7 @@ public class CalendarSyncServiceTests
     private readonly Mock<ExchangeOnPremiseService> _mockOnPremiseService;
     private readonly Mock<ExchangeOnlineSourceService> _mockOnlineSourceService;
     private readonly Mock<ExchangeOnlineService> _mockOnlineService;
+    private readonly Mock<ISyncStateRepository> _mockStateRepository;
     private readonly SyncStatusService _statusService;
     private readonly SyncSettings _syncSettings;
 
@@ -30,6 +31,10 @@ public class CalendarSyncServiceTests
         var mockOnlineLogger = new Mock<ILogger<ExchangeOnlineService>>();
         var onlineSettings = new ExchangeOnlineSettings();
         _mockOnlineService = new Mock<ExchangeOnlineService>(mockOnlineLogger.Object, onlineSettings);
+
+        _mockStateRepository = new Mock<ISyncStateRepository>();
+        _mockStateRepository.Setup(r => r.LoadStateAsync()).ReturnsAsync(new PersistedSyncState());
+        _mockStateRepository.Setup(r => r.SaveStateAsync(It.IsAny<PersistedSyncState>())).Returns(Task.CompletedTask);
 
         _statusService = new SyncStatusService();
         _syncSettings = new SyncSettings
@@ -49,7 +54,8 @@ public class CalendarSyncServiceTests
             _mockOnlineSourceService.Object,
             _mockOnlineService.Object,
             _syncSettings,
-            _statusService
+            _statusService,
+            _mockStateRepository.Object
         );
 
         var mailboxes = new List<string> { "test@example.com" };
@@ -78,7 +84,8 @@ public class CalendarSyncServiceTests
             _mockOnlineSourceService.Object,
             _mockOnlineService.Object,
             _syncSettings,
-            _statusService
+            _statusService,
+            _mockStateRepository.Object
         );
 
         var mappings = new List<MailboxMapping>
@@ -115,7 +122,8 @@ public class CalendarSyncServiceTests
             _mockOnlineSourceService.Object,
             _mockOnlineService.Object,
             _syncSettings,
-            _statusService
+            _statusService,
+            _mockStateRepository.Object
         );
 
         var mappings = new List<MailboxMapping>
@@ -168,7 +176,8 @@ public class CalendarSyncServiceTests
             _mockOnlineSourceService.Object,
             _mockOnlineService.Object,
             _syncSettings,
-            _statusService
+            _statusService,
+            _mockStateRepository.Object
         );
 
         var mappings = new List<MailboxMapping>
@@ -209,7 +218,8 @@ public class CalendarSyncServiceTests
             _mockOnlineSourceService.Object,
             _mockOnlineService.Object,
             _syncSettings,
-            _statusService
+            _statusService,
+            _mockStateRepository.Object
         );
 
         var mappings = new List<MailboxMapping>
@@ -233,5 +243,41 @@ public class CalendarSyncServiceTests
         var status = _statusService.GetStatus();
         status.IsRunning.Should().BeFalse(); // Should be false after completion
         status.LastSyncTime.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task SyncAllMailboxesAsync_ShouldPersistState()
+    {
+        // Arrange
+        var service = new CalendarSyncService(
+            _mockLogger.Object,
+            _mockOnPremiseService.Object,
+            _mockOnlineSourceService.Object,
+            _mockOnlineService.Object,
+            _syncSettings,
+            _statusService,
+            _mockStateRepository.Object
+        );
+
+        var mappings = new List<MailboxMapping>
+        {
+            new()
+            {
+                SourceMailbox = "test@example.com",
+                DestinationMailbox = "test@cloud.com",
+                SourceType = SourceType.ExchangeOnPremise
+            }
+        };
+
+        _mockOnPremiseService
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(new List<CalendarItemSync>());
+
+        // Act
+        await service.SyncAllMailboxesAsync(mappings);
+
+        // Assert
+        _mockStateRepository.Verify(r => r.LoadStateAsync(), Times.Once);
+        _mockStateRepository.Verify(r => r.SaveStateAsync(It.IsAny<PersistedSyncState>()), Times.Once);
     }
 }

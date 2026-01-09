@@ -12,35 +12,15 @@ namespace ExchangeCalendarSync.Tests.Controllers;
 public class SyncControllerTests
 {
     private readonly Mock<ILogger<SyncController>> _mockLogger;
-    private readonly Mock<CalendarSyncService> _mockSyncService;
+    private readonly Mock<ICalendarSyncService> _mockSyncService;
     private readonly SyncStatusService _statusService;
     private readonly ExchangeOnPremiseSettings _settings;
 
     public SyncControllerTests()
     {
         _mockLogger = new Mock<ILogger<SyncController>>();
-
-        var mockServiceLogger = new Mock<ILogger<CalendarSyncService>>();
-        var mockOnPremiseService = new Mock<ExchangeOnPremiseService>(
-            Mock.Of<ILogger<ExchangeOnPremiseService>>(),
-            new ExchangeOnPremiseSettings());
-        var mockOnlineSourceService = new Mock<ExchangeOnlineSourceService>(
-            Mock.Of<ILogger<ExchangeOnlineSourceService>>(),
-            null);
-        var mockOnlineService = new Mock<ExchangeOnlineService>(
-            Mock.Of<ILogger<ExchangeOnlineService>>(),
-            new ExchangeOnlineSettings());
-
+        _mockSyncService = new Mock<ICalendarSyncService>();
         _statusService = new SyncStatusService();
-        var syncSettings = new SyncSettings();
-
-        _mockSyncService = new Mock<CalendarSyncService>(
-            mockServiceLogger.Object,
-            mockOnPremiseService.Object,
-            mockOnlineSourceService.Object,
-            mockOnlineService.Object,
-            syncSettings,
-            _statusService);
 
         _settings = new ExchangeOnPremiseSettings
         {

@@ -26,7 +26,12 @@ COPY --from=build /app/publish .
 
 # Set environment variables
 ENV DOTNET_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:5000
+# Bind to localhost only - use reverse proxy for external access
+# Override with ASPNETCORE_URLS=http://+:5000 if needed for Docker networking
+ENV ASPNETCORE_URLS=http://127.0.0.1:5000
+
+# Create directory for persistent state
+RUN mkdir -p /app/data
 
 # Expose the web interface port
 EXPOSE 5000

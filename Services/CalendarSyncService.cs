@@ -1,17 +1,20 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
 
 namespace ExchangeCalendarSync.Services;
 
-public class CalendarSyncService
+public class CalendarSyncService : ICalendarSyncService
 {
     private readonly ILogger<CalendarSyncService> _logger;
-    private readonly ExchangeOnPremiseService _onPremiseService;
-    private readonly ExchangeOnlineSourceService _onlineSourceService;
-    private readonly ExchangeOnlineService _onlineService;
+    private readonly ICalendarSourceService _onPremiseService;
+    private readonly ICalendarSourceService _onlineSourceService;
+    private readonly ICalendarDestinationService _onlineService;
     private readonly SyncSettings _settings;
-    private readonly SyncStatusService _statusService;
-    private readonly Dictionary<string, DateTime> _lastSyncTimes;
+    private readonly ISyncStatusService _statusService;
+    private readonly ISyncStateRepository _stateRepository;
+    private readonly ConcurrentDictionary<string, DateTime> _lastSyncTimes;
+    private bool _stateLoaded;
 
     public CalendarSyncService(
         ILogger<CalendarSyncService> logger,
@@ -19,7 +22,8 @@ public class CalendarSyncService
         ExchangeOnlineSourceService onlineSourceService,
         ExchangeOnlineService onlineService,
         SyncSettings settings,
-        SyncStatusService statusService)
+        ISyncStatusService statusService,
+        ISyncStateRepository stateRepository)
     {
         _logger = logger;
         _onPremiseService = onPremiseService;
@@ -27,7 +31,31 @@ public class CalendarSyncService
         _onlineService = onlineService;
         _settings = settings;
         _statusService = statusService;
-        _lastSyncTimes = new Dictionary<string, DateTime>();
+        _stateRepository = stateRepository;
+        _lastSyncTimes = new ConcurrentDictionary<string, DateTime>();
+        _stateLoaded = false;
+    }
+
+    private async Task EnsureStateLoadedAsync()
+    {
+        if (_stateLoaded) return;
+
+        var state = await _stateRepository.LoadStateAsync();
+        foreach (var kvp in state.LastSyncTimes)
+        {
+            _lastSyncTimes.TryAdd(kvp.Key, kvp.Value);
+        }
+        _stateLoaded = true;
+        _logger.LogInformation("Loaded {Count} sync times from persisted state", state.LastSyncTimes.Count);
+    }
+
+    private async Task PersistStateAsync()
+    {
+        var state = new PersistedSyncState
+        {
+            LastSyncTimes = new Dictionary<string, DateTime>(_lastSyncTimes)
+        };
+        await _stateRepository.SaveStateAsync(state);
     }
 
     // Legacy method for backward compatibility
@@ -45,6 +73,8 @@ public class CalendarSyncService
 
     public virtual async Task SyncAllMailboxesAsync(List<MailboxMapping> mailboxMappings)
     {
+        await EnsureStateLoadedAsync();
+
         _statusService.StartSync();
         _logger.LogInformation("Starting sync for {Count} mailbox mappings", mailboxMappings.Count);
 
@@ -63,6 +93,9 @@ public class CalendarSyncService
                     0, 1, "Failed");
             }
         }
+
+        // Persist state after sync completes
+        await PersistStateAsync();
 
         _logger.LogInformation("Completed sync for all mailboxes");
         _statusService.EndSync();
@@ -83,8 +116,8 @@ public class CalendarSyncService
 
             // Determine the date range to sync
             var endDate = DateTime.UtcNow.AddDays(30); // Look ahead 30 days
-            var startDate = _lastSyncTimes.ContainsKey(mapping.SourceMailbox)
-                ? _lastSyncTimes[mapping.SourceMailbox].AddMinutes(-5) // Overlap by 5 minutes to catch updates
+            var startDate = _lastSyncTimes.TryGetValue(mapping.SourceMailbox, out var lastSync)
+                ? lastSync.AddMinutes(-5) // Overlap by 5 minutes to catch updates
                 : DateTime.UtcNow.AddDays(-_settings.LookbackDays); // Initial sync
 
             // Get calendar items from appropriate source based on SourceType

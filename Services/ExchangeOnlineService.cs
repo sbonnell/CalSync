@@ -7,7 +7,7 @@ using Azure.Identity;
 
 namespace ExchangeCalendarSync.Services;
 
-public class ExchangeOnlineService
+public class ExchangeOnlineService : ICalendarDestinationService
 {
     private readonly ILogger<ExchangeOnlineService> _logger;
     private readonly ExchangeOnlineSettings _settings;

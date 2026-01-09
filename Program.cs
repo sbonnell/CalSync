@@ -1,9 +1,12 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
 using ExchangeCalendarSync.Services;
 using ExchangeCalendarSync.Logging;
+using ExchangeCalendarSync.Middleware;
 
 namespace ExchangeCalendarSync;
 
@@ -26,6 +29,7 @@ class Program
         if (appSettings.ExchangeOnlineSource != null)
             builder.Services.AddSingleton(appSettings.ExchangeOnlineSource);
         builder.Services.AddSingleton(appSettings.Sync);
+        builder.Services.AddSingleton(appSettings.Persistence);
         builder.Services.AddSingleton(appSettings);
 
         // Register in-memory log provider
@@ -37,15 +41,46 @@ class Program
         builder.Logging.AddConsole();
         builder.Logging.AddProvider(logProvider);
 
-        // Register services
+        // Register services with interfaces
         builder.Services.AddSingleton<ExchangeOnPremiseService>();
         builder.Services.AddSingleton<ExchangeOnlineSourceService>();
         builder.Services.AddSingleton<ExchangeOnlineService>();
-        builder.Services.AddSingleton<SyncStatusService>();
-        builder.Services.AddSingleton<CalendarSyncService>();
+        builder.Services.AddSingleton<ISyncStatusService, SyncStatusService>();
+        builder.Services.AddSingleton<ISyncStateRepository, SyncStateRepository>();
+        builder.Services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
 
         // Add background service for sync loop
         builder.Services.AddHostedService<SyncBackgroundService>();
+
+        // Add global exception handler
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddProblemDetails();
+
+        // Add rate limiting
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Rate limit for sync start endpoint: max 5 requests per minute
+            options.AddFixedWindowLimiter("sync", limiterOptions =>
+            {
+                limiterOptions.Window = TimeSpan.FromMinutes(1);
+                limiterOptions.PermitLimit = 5;
+                limiterOptions.QueueLimit = 0;
+            });
+
+            // General API rate limit: max 60 requests per minute
+            options.AddFixedWindowLimiter("api", limiterOptions =>
+            {
+                limiterOptions.Window = TimeSpan.FromMinutes(1);
+                limiterOptions.PermitLimit = 60;
+                limiterOptions.QueueLimit = 2;
+            });
+        });
+
+        // Add health checks
+        builder.Services.AddHealthChecks()
+            .AddCheck<SyncServiceHealthCheck>("sync_service");
 
         // Add controllers and web services
         builder.Services.AddControllers()
@@ -99,13 +134,18 @@ class Program
         }
 
         // Configure HTTP pipeline
+        app.UseExceptionHandler();
+        app.UseRateLimiter();
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.MapControllers();
+        app.MapHealthChecks("/health");
 
         logger.LogInformation("Web interface available at http://localhost:5000");
+        logger.LogInformation("Health check available at http://localhost:5000/health");
         logger.LogInformation("Monitoring {Count} mailbox mappings", appSettings.ExchangeOnPremise.GetMailboxMappings().Count);
         logger.LogInformation("Sync interval: {Minutes} minutes", appSettings.Sync.SyncIntervalMinutes);
+        logger.LogInformation("State persistence: {Enabled}", appSettings.Persistence.EnableStatePersistence ? "enabled" : "disabled");
 
         await app.RunAsync();
     }

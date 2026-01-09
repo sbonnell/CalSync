@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ExchangeCalendarSync.Services;
 using ExchangeCalendarSync.Models;
 
@@ -6,17 +7,18 @@ namespace ExchangeCalendarSync.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("api")]
 public class SyncController : ControllerBase
 {
     private readonly ILogger<SyncController> _logger;
-    private readonly CalendarSyncService _syncService;
-    private readonly SyncStatusService _statusService;
+    private readonly ICalendarSyncService _syncService;
+    private readonly ISyncStatusService _statusService;
     private readonly ExchangeOnPremiseSettings _settings;
 
     public SyncController(
         ILogger<SyncController> logger,
-        CalendarSyncService syncService,
-        SyncStatusService statusService,
+        ICalendarSyncService syncService,
+        ISyncStatusService statusService,
         ExchangeOnPremiseSettings settings)
     {
         _logger = logger;
@@ -33,6 +35,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("start")]
+    [EnableRateLimiting("sync")]
     public async Task<IActionResult> StartSync()
     {
         _logger.LogInformation("Manual sync requested via API");
