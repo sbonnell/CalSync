@@ -14,14 +14,27 @@ A C# application that runs in a Linux Docker container to synchronize calendar i
 - Monitors multiple mailboxes simultaneously
 - Excludes attachments for security (attachments are never synced)
 - **Web interface** for monitoring and control:
-  - Real-time sync status dashboard
-  - View recent logs with filtering
-  - Manual sync trigger
-  - Per-mailbox statistics
+  - Real-time sync status dashboard with countdown timer
+  - View recent logs with level filtering and mailbox filtering
+  - Manual sync trigger (full sync and incremental sync)
+  - Per-mailbox statistics (items evaluated, created, updated, unchanged)
+  - **Settings page** for runtime configuration
+  - Start/Stop sync controls
+  - Application restart capability
+- **Settings Management**:
+  - Web-based configuration editor
+  - Hot reload on configuration changes
+  - Secure handling of passwords and secrets
+- **State Persistence**:
+  - Tracks sync state across application restarts
+  - Persists sync timestamps per mailbox
+  - Configurable data storage path
 - Runs in a Docker container on Linux
 - Configurable sync intervals
-- Comprehensive logging
+- Comprehensive logging with rate limiting
 - Automatic retry on errors
+- API rate limiting to prevent abuse
+- Health check endpoint for container orchestration
 - Prevents duplicate entries using extended properties
 
 ## Prerequisites
@@ -204,10 +217,13 @@ Once running, access the **web interface** at:
 - **http://localhost:5000**
 
 The web interface provides:
-- Real-time sync status and statistics
-- Recent logs with level filtering
-- Manual sync trigger button
-- Per-mailbox sync details
+- Real-time sync status with countdown timer to next sync
+- Recent logs with level filtering and mailbox filtering
+- Manual sync buttons (Full Sync and Incremental Sync)
+- Start/Stop sync controls
+- Per-mailbox sync details (evaluated, created, updated, unchanged items)
+- **Settings page** for runtime configuration at `/settings.html`
+- **Help page** with documentation at `/help.html`
 
 ### Using Docker
 
@@ -295,6 +311,42 @@ dotnet test ExchangeCalendarSync.Tests/ExchangeCalendarSync.Tests.csproj
 - Credentials are stored in `appsettings.json` - consider using environment variables or secrets management in production
 - SSL certificate validation is bypassed for Exchange 2019 (update `ExchangeOnPremiseService.cs:28` for production)
 - Service runs with minimal permissions (no delete rights)
+- API rate limiting protects against abuse (100 requests per minute per endpoint)
+- Passwords are never returned via the settings API (only accepted on write)
+
+## State Persistence
+
+The application can persist sync state to track which items have been synced across application restarts.
+
+### Configuration
+
+```json
+{
+  "Persistence": {
+    "DataPath": "./data",
+    "EnableStatePersistence": true
+  }
+}
+```
+
+### Features
+- **Sync timestamps**: Tracks last sync time per mailbox
+- **Restart resilience**: Resumes from last known state after restart
+- **Docker volumes**: Use volume mounts to persist data outside the container
+
+### Docker Volume Setup
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+## Configuration Hot Reload
+
+The application monitors the configuration file for changes and automatically restarts when settings are modified. This enables:
+
+- **Runtime configuration**: Update settings via the web UI without manual restarts
+- **Debounced restarts**: Prevents multiple rapid restarts during file writes
+- **Health checks**: Container orchestrators can monitor `/health` endpoint during restarts
 
 ## Logging
 
@@ -385,42 +437,71 @@ Logs are written to the console and captured by Docker. Log levels can be config
 The application includes a built-in web dashboard accessible at **http://localhost:5000** that provides:
 
 ### Features
-- **Status Dashboard**: Real-time sync status, total items synced, errors, and last sync time
-- **Manual Sync**: Trigger an immediate sync without waiting for the scheduled interval
-- **Mailbox Details**: Per-mailbox sync statistics including items synced, errors, and last sync time
+- **Status Dashboard**: Real-time sync status with countdown timer, total items synced, errors, and last sync time
+- **Manual Sync**: Trigger full or incremental sync without waiting for the scheduled interval
+- **Sync Control**: Start/stop scheduled sync, restart application
+- **Mailbox Details**: Per-mailbox sync statistics including items evaluated, created, updated, unchanged, and errors
+- **Mailbox Filtering**: Click on a mailbox to filter logs to show only entries for that mailbox
 - **Live Logs**: View recent logs with minimum level filtering (shows selected level and more severe)
 - **Auto-refresh**: Dashboard and logs refresh automatically every 5 seconds
+- **Settings Page**: Configure all application settings via web UI at `/settings.html`
+- **Help Page**: In-app documentation and troubleshooting guide at `/help.html`
 
 ### API Endpoints
 
 The web interface uses these REST API endpoints:
 
 - `GET /api/sync/status` - Get current sync status and statistics
-- `POST /api/sync/start` - Trigger a manual sync
+- `POST /api/sync/start` - Trigger a manual sync (`?fullSync=true` for full sync)
+- `POST /api/sync/toggle` - Start or stop scheduled sync
+- `POST /api/sync/restart` - Restart the application
 - `GET /api/logs?level={level}&limit={limit}` - Retrieve logs (level filters to minimum severity)
+- `GET /api/settings` - Get current configuration (passwords excluded)
+- `PUT /api/settings` - Update configuration (triggers app restart)
+- `GET /health` - Health check endpoint for container orchestration
 
 ## Project Structure
 
 ```
 ExchangeCalendarSync/
 ├── Controllers/
-│   ├── SyncController.cs       # API endpoints for sync control
-│   └── LogsController.cs       # API endpoints for logs
+│   ├── SyncController.cs           # API endpoints for sync control
+│   ├── LogsController.cs           # API endpoints for logs
+│   └── SettingsController.cs       # API endpoints for settings management
 ├── Logging/
-│   └── InMemoryLoggerProvider.cs  # In-memory log storage
+│   └── InMemoryLoggerProvider.cs   # In-memory log storage
+├── Middleware/
+│   └── GlobalExceptionHandler.cs   # Global exception handling
 ├── Models/
-│   ├── AppSettings.cs          # Configuration models
-│   ├── CalendarItem.cs         # Calendar item DTO
-│   └── SyncStatus.cs           # Sync status models
+│   ├── AppSettings.cs              # Configuration models
+│   ├── CalendarItem.cs             # Calendar item DTO
+│   ├── PersistedSyncState.cs       # State persistence models
+│   └── SyncStatus.cs               # Sync status models
 ├── Services/
-│   ├── ExchangeOnPremiseService.cs  # EWS client
+│   ├── ExchangeOnPremiseService.cs     # EWS client (source)
 │   ├── ExchangeOnlineSourceService.cs  # Graph API source client
-│   ├── ExchangeOnlineService.cs     # Graph API destination client
-│   ├── CalendarSyncService.cs       # Sync orchestration
-│   ├── SyncStatusService.cs         # Status tracking
-│   └── SyncBackgroundService.cs     # Background sync service
+│   ├── ExchangeOnlineService.cs        # Graph API destination client
+│   ├── CalendarSyncService.cs          # Sync orchestration
+│   ├── SyncStatusService.cs            # Status tracking
+│   ├── SyncBackgroundService.cs        # Background sync service
+│   ├── SyncStateRepository.cs          # State persistence
+│   ├── SyncServiceHealthCheck.cs       # Health check implementation
+│   └── ConfigurationWatcherService.cs  # Config file change detection
+├── Services/Interfaces/
+│   ├── ICalendarSourceService.cs       # Source service interface
+│   ├── ICalendarDestinationService.cs  # Destination service interface
+│   ├── ICalendarSyncService.cs         # Sync service interface
+│   └── ISyncStatusService.cs           # Status service interface
 ├── wwwroot/
-│   └── index.html              # Web dashboard UI
+│   ├── index.html              # Web dashboard UI
+│   ├── settings.html           # Settings configuration UI
+│   ├── help.html               # Help and documentation page
+│   ├── css/
+│   │   └── styles.css          # Shared CSS styles
+│   └── js/
+│       ├── common.js           # Shared JavaScript utilities
+│       ├── dashboard.js        # Dashboard functionality
+│       └── settings.js         # Settings page functionality
 ├── Program.cs                   # Application entry point
 ├── ExchangeCalendarSync.csproj # Project file
 ├── appsettings.json            # Configuration

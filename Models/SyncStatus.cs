@@ -21,6 +21,7 @@ public class MailboxSyncStatus
     public int ItemsEvaluated { get; set; }
     public int ItemsCreated { get; set; }
     public int ItemsUpdated { get; set; }
+    public int ItemsDeleted { get; set; }
     public int ItemsUnchanged { get; set; }
     public int Errors { get; set; }
     public string Status { get; set; } = "Pending";

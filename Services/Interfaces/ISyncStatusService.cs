@@ -12,7 +12,7 @@ public interface ISyncStatusService
     void EndSync();
     void SetNextScheduledSync(DateTime nextSync);
     void UpdateMailboxStatus(string mailbox, int itemsSynced, int errors, string status);
-    void UpdateMailboxStatus(string mailbox, int evaluated, int created, int updated, int unchanged, int errors, string status);
+    void UpdateMailboxStatus(string mailbox, int evaluated, int created, int updated, int deleted, int unchanged, int errors, string status);
     Task<bool> TryAcquireSyncLock();
     void ReleaseSyncLock();
 }

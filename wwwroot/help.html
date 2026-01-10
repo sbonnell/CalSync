@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarasin Exchange Calendar Sync - Help</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        /* Page-specific overrides */
+        .container { max-width: 1000px; }
+        h2 { border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Help & Documentation</h1>
+                <p class="subtitle">Exchange Calendar Sync User Guide</p>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/settings.html" class="nav-link">Settings</a>
+            </div>
+        </header>
+
+        <div class="card">
+            <div class="toc">
+                <h3>Table of Contents</h3>
+                <ul>
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#getting-started">Getting Started</a></li>
+                    <li><a href="#dashboard">Using the Dashboard</a></li>
+                    <li><a href="#settings">Configuring Settings</a></li>
+                    <li><a href="#mailbox-mappings">Mailbox Mappings</a></li>
+                    <li><a href="#sync-operations">Sync Operations</a></li>
+                    <li><a href="#logs">Understanding Logs</a></li>
+                    <li><a href="#api">API Reference</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card" id="overview">
+            <h2>Overview</h2>
+            <p>Exchange Calendar Sync is a one-way synchronization tool that copies calendar items from a source Exchange environment to a destination Exchange Online mailbox. It supports:</p>
+            <ul>
+                <li><strong>Exchange 2019 (On-Premise)</strong> as a source via EWS (Exchange Web Services)</li>
+                <li><strong>Exchange Online</strong> as a source via Microsoft Graph API</li>
+                <li><strong>Exchange Online</strong> as the destination (always required)</li>
+            </ul>
+            <div class="tip">
+                <div class="tip-title">Key Features</div>
+                <ul>
+                    <li>Automatic sync at configurable intervals</li>
+                    <li>Full sync and incremental sync options</li>
+                    <li>Per-mailbox statistics and filtering</li>
+                    <li>Attachments are never synced (security feature)</li>
+                    <li>Duplicate prevention using extended properties</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card" id="getting-started">
+            <h2>Getting Started</h2>
+            <h3>Prerequisites</h3>
+            <ol>
+                <li><strong>Azure AD App Registration</strong> - Required for Exchange Online access
+                    <ul>
+                        <li>Application (client) ID</li>
+                        <li>Directory (tenant) ID</li>
+                        <li>Client secret</li>
+                        <li><code>Calendars.ReadWrite</code> permission (Application type)</li>
+                    </ul>
+                </li>
+                <li><strong>Exchange On-Premise</strong> (if using as source)
+                    <ul>
+                        <li>EWS URL (e.g., <code>https://exchange.domain.com/EWS/Exchange.asmx</code>)</li>
+                        <li>Service account with impersonation rights</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>Quick Setup</h3>
+            <ol>
+                <li>Navigate to <a href="/settings.html">Settings</a></li>
+                <li>Configure your Exchange connection details</li>
+                <li>Add mailbox mappings (source to destination)</li>
+                <li>Save settings (application will restart automatically)</li>
+                <li>Return to the <a href="/">Dashboard</a> to monitor sync status</li>
+            </ol>
+        </div>
+
+        <div class="card" id="dashboard">
+            <h2>Using the Dashboard</h2>
+            <p>The dashboard provides real-time monitoring of your sync operations.</p>
+
+            <h3>Status Indicators</h3>
+            <table>
+                <tr>
+                    <th>Status</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>NEXT: Xm Xs</code></td>
+                    <td>Countdown to next scheduled sync</td>
+                </tr>
+                <tr>
+                    <td><code>RUNNING</code></td>
+                    <td>Sync operation is currently in progress</td>
+                </tr>
+                <tr>
+                    <td><code>STOPPED</code></td>
+                    <td>Scheduled sync is disabled</td>
+                </tr>
+                <tr>
+                    <td><code>IDLE</code></td>
+                    <td>Waiting (no scheduled sync time available)</td>
+                </tr>
+            </table>
+
+            <h3>Statistics</h3>
+            <ul>
+                <li><strong>Total Items Synced</strong> - Cumulative count of items created or updated</li>
+                <li><strong>Total Errors</strong> - Number of sync errors encountered</li>
+                <li><strong>Last Sync</strong> - Time since the last sync completed</li>
+            </ul>
+
+            <h3>Mailbox Statistics</h3>
+            <p>Each configured mailbox shows:</p>
+            <ul>
+                <li><strong>Evaluated</strong> - Items checked in the source</li>
+                <li><strong>Created</strong> - New items created in destination</li>
+                <li><strong>Updated</strong> - Existing items updated</li>
+                <li><strong>Deleted</strong> - Items removed from destination (cancelled or no longer in source)</li>
+                <li><strong>Unchanged</strong> - Items already in sync</li>
+                <li><strong>Errors</strong> - Errors for this mailbox</li>
+            </ul>
+            <div class="tip">
+                <div class="tip-title">Tip</div>
+                Click on a mailbox to filter the logs to show only entries related to that mailbox.
+            </div>
+        </div>
+
+        <div class="card" id="settings">
+            <h2>Configuring Settings</h2>
+            <p>Access the <a href="/settings.html">Settings page</a> to configure the application.</p>
+
+            <h3>Sync Settings</h3>
+            <table>
+                <tr>
+                    <th>Setting</th>
+                    <th>Description</th>
+                    <th>Default</th>
+                </tr>
+                <tr>
+                    <td>Sync Interval</td>
+                    <td>Minutes between automatic syncs</td>
+                    <td>5</td>
+                </tr>
+                <tr>
+                    <td>Look Back Days</td>
+                    <td>How many days in the past to sync</td>
+                    <td>30</td>
+                </tr>
+                <tr>
+                    <td>Look Forward Days</td>
+                    <td>How many days in the future to sync</td>
+                    <td>30</td>
+                </tr>
+            </table>
+
+            <h3>Exchange On-Premise (Source)</h3>
+            <p>Required only if using Exchange On-Premise as a source:</p>
+            <ul>
+                <li><strong>Server URL</strong> - EWS endpoint URL</li>
+                <li><strong>Domain</strong> - Windows domain name</li>
+                <li><strong>Username</strong> - Service account username</li>
+                <li><strong>Password</strong> - Service account password</li>
+            </ul>
+
+            <h3>Exchange Online Source</h3>
+            <p>Required only if using Exchange Online as a source:</p>
+            <ul>
+                <li><strong>Tenant ID</strong> - Azure AD tenant ID</li>
+                <li><strong>Client ID</strong> - Application (client) ID</li>
+                <li><strong>Client Secret</strong> - Application secret</li>
+            </ul>
+
+            <h3>Exchange Online Destination</h3>
+            <p>Always required - this is where calendar items are synced to:</p>
+            <ul>
+                <li><strong>Tenant ID</strong> - Azure AD tenant ID</li>
+                <li><strong>Client ID</strong> - Application (client) ID</li>
+                <li><strong>Client Secret</strong> - Application secret</li>
+            </ul>
+
+            <div class="warning">
+                <div class="warning-title">Important</div>
+                When you save settings, the application will automatically restart to apply changes. The page will reload automatically once the application is ready.
+            </div>
+        </div>
+
+        <div class="card" id="mailbox-mappings">
+            <h2>Mailbox Mappings</h2>
+            <p>Mailbox mappings define which source mailboxes sync to which destination mailboxes.</p>
+
+            <h3>Configuration Fields</h3>
+            <table>
+                <tr>
+                    <th>Field</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Name</td>
+                    <td>A friendly name for this mapping (used in logs and filtering)</td>
+                </tr>
+                <tr>
+                    <td>Source Mailbox</td>
+                    <td>Email address of the source mailbox</td>
+                </tr>
+                <tr>
+                    <td>Destination Mailbox</td>
+                    <td>Email address of the destination mailbox</td>
+                </tr>
+                <tr>
+                    <td>Source Type</td>
+                    <td><code>ExchangeOnPremise</code> or <code>ExchangeOnline</code></td>
+                </tr>
+            </table>
+
+            <h3>Example Scenarios</h3>
+            <ul>
+                <li><strong>On-Premise to Cloud Migration</strong>: Source Type = Exchange On-Premise</li>
+                <li><strong>Cross-Tenant Sync</strong>: Source Type = Exchange Online (different tenant)</li>
+                <li><strong>Same Tenant Copy</strong>: Source Type = Exchange Online (same tenant, different mailbox)</li>
+            </ul>
+        </div>
+
+        <div class="card" id="sync-operations">
+            <h2>Sync Operations</h2>
+
+            <h3>Automatic Sync</h3>
+            <p>By default, the application runs sync operations at the configured interval. Use the <strong>Stop Sync</strong> button to pause automatic syncing, and <strong>Start Sync</strong> to resume.</p>
+
+            <h3>Manual Sync</h3>
+            <table>
+                <tr>
+                    <th>Button</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Run Full Sync</td>
+                    <td>Syncs all items within the lookback/forward window, regardless of last sync time</td>
+                </tr>
+                <tr>
+                    <td>Incremental Sync</td>
+                    <td>Syncs only items modified since the last sync</td>
+                </tr>
+            </table>
+
+            <h3>Restart App</h3>
+            <p>Use this button to restart the application. This is useful after making configuration changes outside the Settings page or to resolve transient issues.</p>
+
+            <div class="tip">
+                <div class="tip-title">When to Use Full Sync</div>
+                <ul>
+                    <li>After initial setup</li>
+                    <li>If you suspect items were missed</li>
+                    <li>After changing lookback/forward days settings</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card" id="logs">
+            <h2>Understanding Logs</h2>
+            <p>The log viewer shows recent application activity with filtering options.</p>
+
+            <h3>Log Levels</h3>
+            <table>
+                <tr>
+                    <th>Level</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>Critical</code></td>
+                    <td>Application failures requiring immediate attention</td>
+                </tr>
+                <tr>
+                    <td><code>Error</code></td>
+                    <td>Operation failures (sync errors, connection issues)</td>
+                </tr>
+                <tr>
+                    <td><code>Warning</code></td>
+                    <td>Potential issues that didn't prevent operation</td>
+                </tr>
+                <tr>
+                    <td><code>Information</code></td>
+                    <td>Normal operation messages (sync started, completed)</td>
+                </tr>
+                <tr>
+                    <td><code>Debug</code></td>
+                    <td>Detailed diagnostic information</td>
+                </tr>
+                <tr>
+                    <td><code>Trace</code></td>
+                    <td>Very detailed tracing (rarely needed)</td>
+                </tr>
+            </table>
+
+            <h3>Filtering</h3>
+            <ul>
+                <li><strong>Minimum Level</strong>: Shows logs at the selected level and more severe</li>
+                <li><strong>Mailbox Filter</strong>: Click a mailbox in the dashboard to filter logs for that mailbox</li>
+            </ul>
+        </div>
+
+        <div class="card" id="api">
+            <h2>API Reference</h2>
+            <p>The application exposes REST API endpoints for integration and automation.</p>
+
+            <table>
+                <tr>
+                    <th>Method</th>
+                    <th>Endpoint</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/sync/status</code></td>
+                    <td>Get current sync status and statistics</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/sync/start</code></td>
+                    <td>Trigger manual sync (<code>?fullSync=true</code> for full)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/sync/toggle</code></td>
+                    <td>Toggle scheduled sync on/off</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/sync/restart</code></td>
+                    <td>Restart the application</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/logs</code></td>
+                    <td>Get logs (<code>?level=Information&limit=100</code>)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/settings</code></td>
+                    <td>Get current settings (passwords excluded)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-put">PUT</span></td>
+                    <td><code>/api/settings</code></td>
+                    <td>Update settings (triggers restart)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/health</code></td>
+                    <td>Health check endpoint</td>
+                </tr>
+            </table>
+
+            <h3>Example: Trigger Full Sync via API</h3>
+            <pre>curl -X POST "http://localhost:5000/api/sync/start?fullSync=true"</pre>
+
+            <h3>Example: Get Status</h3>
+            <pre>curl "http://localhost:5000/api/sync/status"</pre>
+        </div>
+
+        <div class="card" id="troubleshooting">
+            <h2>Troubleshooting</h2>
+
+            <h3>Connection Issues</h3>
+            <div class="danger">
+                <div class="danger-title">Exchange On-Premise Errors</div>
+                <ul>
+                    <li>Verify the EWS URL is accessible from the Docker container</li>
+                    <li>Check firewall rules allow outbound connections</li>
+                    <li>Verify credentials and impersonation rights</li>
+                    <li>Ensure the service account has <code>ApplicationImpersonation</code> role</li>
+                </ul>
+            </div>
+
+            <div class="danger">
+                <div class="danger-title">Exchange Online Errors</div>
+                <ul>
+                    <li>Verify Azure AD app has <code>Calendars.ReadWrite</code> permission</li>
+                    <li>Ensure admin consent has been granted</li>
+                    <li>Check Client ID, Client Secret, and Tenant ID are correct</li>
+                    <li>Verify the mailbox exists in Exchange Online</li>
+                </ul>
+            </div>
+
+            <h3>Sync Issues</h3>
+            <table>
+                <tr>
+                    <th>Problem</th>
+                    <th>Solution</th>
+                </tr>
+                <tr>
+                    <td>Items not syncing</td>
+                    <td>Check if items fall within the lookback/forward window. Try a Full Sync.</td>
+                </tr>
+                <tr>
+                    <td>Duplicate items</td>
+                    <td>Extended property storage may have issues. Check destination calendar for existing sync markers.</td>
+                </tr>
+                <tr>
+                    <td>Sync never completes</td>
+                    <td>Check logs for errors. Reduce the number of mailboxes or lookback days.</td>
+                </tr>
+                <tr>
+                    <td>Rate limit errors</td>
+                    <td>Increase sync interval to reduce API call frequency.</td>
+                </tr>
+            </table>
+
+            <h3>Common Log Messages</h3>
+            <table>
+                <tr>
+                    <th>Message</th>
+                    <th>Meaning</th>
+                </tr>
+                <tr>
+                    <td><code>Sync started for [mailbox]</code></td>
+                    <td>Normal - sync operation beginning</td>
+                </tr>
+                <tr>
+                    <td><code>Created X, Updated Y, Unchanged Z</code></td>
+                    <td>Normal - sync summary for mailbox</td>
+                </tr>
+                <tr>
+                    <td><code>Failed to authenticate</code></td>
+                    <td>Credentials are incorrect or expired</td>
+                </tr>
+                <tr>
+                    <td><code>Mailbox not found</code></td>
+                    <td>Email address doesn't exist in target system</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="card" id="faq">
+            <h2>Frequently Asked Questions</h2>
+
+            <h3>Can I sync bidirectionally?</h3>
+            <p>No, this tool only supports one-way sync from source to destination. Changes made in the destination will be overwritten on the next sync.</p>
+
+            <h3>Are attachments synced?</h3>
+            <p>No, attachments are intentionally excluded for security reasons. Only the calendar event metadata (subject, time, location, body, attendees) is synced.</p>
+
+            <h3>What happens if I delete an item in the source?</h3>
+            <p>Deletions are not synced. Items deleted from the source will remain in the destination. You must manually delete them if needed.</p>
+
+            <h3>Can I sync to multiple destinations?</h3>
+            <p>Yes, create multiple mailbox mappings with different destination mailboxes.</p>
+
+            <h3>How do I know if sync is working?</h3>
+            <p>Check the dashboard for:</p>
+            <ul>
+                <li>Status showing countdown or "RUNNING"</li>
+                <li>Items Synced counter increasing</li>
+                <li>Last Sync time updating</li>
+                <li>Logs showing successful sync messages</li>
+            </ul>
+
+            <h3>What permissions does the Azure AD app need?</h3>
+            <p>The app requires <code>Calendars.ReadWrite</code> as an <strong>Application permission</strong> (not Delegated). Admin consent must be granted.</p>
+
+            <h3>Can I run this outside of Docker?</h3>
+            <p>Yes, you can run it directly with <code>dotnet run</code> for development or testing. See the README for local development instructions.</p>
+        </div>
+    </div>
+</body>
+</html>

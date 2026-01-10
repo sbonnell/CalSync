@@ -108,7 +108,7 @@ public class SyncStatusService : ISyncStatusService
         }
     }
 
-    public void UpdateMailboxStatus(string mailbox, int evaluated, int created, int updated, int unchanged, int errors, string status)
+    public void UpdateMailboxStatus(string mailbox, int evaluated, int created, int updated, int deleted, int unchanged, int errors, string status)
     {
         lock (_statusLock)
         {
@@ -125,12 +125,13 @@ public class SyncStatusService : ISyncStatusService
             mailboxStatus.ItemsEvaluated = evaluated;
             mailboxStatus.ItemsCreated = created;
             mailboxStatus.ItemsUpdated = updated;
+            mailboxStatus.ItemsDeleted = deleted;
             mailboxStatus.ItemsUnchanged = unchanged;
-            mailboxStatus.ItemsSynced = created + updated + unchanged;
+            mailboxStatus.ItemsSynced = created + updated + deleted + unchanged;
             mailboxStatus.Errors = errors;
             mailboxStatus.Status = status;
 
-            _status.TotalItemsSynced += created + updated + unchanged;
+            _status.TotalItemsSynced += created + updated + deleted + unchanged;
             _status.TotalErrors += errors;
         }
     }

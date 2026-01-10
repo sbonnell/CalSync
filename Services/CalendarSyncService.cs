@@ -168,6 +168,7 @@ public class CalendarSyncService : ICalendarSyncService
             // Sync each active item to destination (one-way sync, no attachments)
             var createdCount = 0;
             var updatedCount = 0;
+            var deletedCount = 0;
             var noChangeCount = 0;
             var failureCount = 0;
 
@@ -225,7 +226,7 @@ public class CalendarSyncService : ICalendarSyncService
 
                     if (deleted)
                     {
-                        updatedCount++; // Deletions count as updates
+                        deletedCount++;
                     }
                     else
                     {
@@ -244,17 +245,17 @@ public class CalendarSyncService : ICalendarSyncService
 
             // Handle deletions: find items in destination that no longer exist in source
             var (deletionSuccesses, deletionFailures) = await SyncDeletionsAsync(mapping, startDate, endDate, activeItems);
-            updatedCount += deletionSuccesses; // Deletions count as updates
+            deletedCount += deletionSuccesses;
             failureCount += deletionFailures;
 
             var evaluatedCount = activeItems.Count + cancelledItems.Count;
             _logger.LogInformation(
-                "[{MappingName}] Sync completed: {Evaluated} evaluated, {Created} created, {Updated} updated, {NoChange} unchanged, {Failures} failed",
-                displayName, evaluatedCount, createdCount, updatedCount, noChangeCount, failureCount);
+                "[{MappingName}] Sync completed: {Evaluated} evaluated, {Created} created, {Updated} updated, {Deleted} deleted, {NoChange} unchanged, {Failures} failed",
+                displayName, evaluatedCount, createdCount, updatedCount, deletedCount, noChangeCount, failureCount);
 
             // Update last sync time and status with detailed counts
             _lastSyncTimes[mapping.SourceMailbox] = DateTime.UtcNow;
-            _statusService.UpdateMailboxStatus(displayName, evaluatedCount, createdCount, updatedCount, noChangeCount, failureCount,
+            _statusService.UpdateMailboxStatus(displayName, evaluatedCount, createdCount, updatedCount, deletedCount, noChangeCount, failureCount,
                 failureCount > 0 ? "Completed with errors" : "Completed");
         }
         catch (Exception ex)
