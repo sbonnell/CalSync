@@ -54,13 +54,46 @@ public class LocalhostOnlyMiddleware
         if (remoteIp.Equals(IPAddress.IPv6Loopback))
             return true;
 
-        // Handle IPv4-mapped IPv6 addresses (::ffff:127.0.0.1)
+        // Handle IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
         if (remoteIp.IsIPv4MappedToIPv6)
         {
             var ipv4 = remoteIp.MapToIPv4();
             if (IPAddress.IsLoopback(ipv4))
                 return true;
+
+            // Check for private networks (Docker, local network)
+            if (IsPrivateNetwork(ipv4))
+                return true;
         }
+
+        // Check for private networks
+        if (IsPrivateNetwork(remoteIp))
+            return true;
+
+        return false;
+    }
+
+    private static bool IsPrivateNetwork(IPAddress ip)
+    {
+        var bytes = ip.GetAddressBytes();
+        if (bytes.Length != 4)
+            return false;
+
+        // 10.0.0.0/8 - Class A private network
+        if (bytes[0] == 10)
+            return true;
+
+        // 172.16.0.0/12 - Class B private network (includes Docker's 172.17-31.x.x)
+        if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+            return true;
+
+        // 192.168.0.0/16 - Class C private network
+        if (bytes[0] == 192 && bytes[1] == 168)
+            return true;
+
+        // 127.0.0.0/8 - Loopback
+        if (bytes[0] == 127)
+            return true;
 
         return false;
     }
