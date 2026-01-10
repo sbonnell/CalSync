@@ -13,6 +13,7 @@ public class SyncStatusService : ISyncStatusService
     {
         _status = new SyncStatus
         {
+            IsSyncEnabled = true,
             MailboxStatuses = new ConcurrentDictionary<string, MailboxSyncStatus>()
         };
         _syncLock = new SemaphoreSlim(1, 1);
