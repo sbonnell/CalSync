@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
 
@@ -73,52 +74,65 @@ public class CalendarSyncService : ICalendarSyncService
 
     public virtual async Task SyncAllMailboxesAsync(List<MailboxMapping> mailboxMappings)
     {
+        await SyncAllMailboxesAsync(mailboxMappings, forceFullSync: false);
+    }
+
+    public virtual async Task SyncAllMailboxesAsync(List<MailboxMapping> mailboxMappings, bool forceFullSync)
+    {
         await EnsureStateLoadedAsync();
 
+        // Note: forceFullSync now only affects whether change detection is bypassed
+        // (items are force-updated even if LastModified hasn't changed)
+        // The date range is always the full lookback/lookforward window
+
+        var stopwatch = Stopwatch.StartNew();
         _statusService.StartSync();
-        _logger.LogInformation("Starting sync for {Count} mailbox mappings", mailboxMappings.Count);
+        var syncType = forceFullSync ? "full" : "incremental";
+        _logger.LogInformation("Starting {SyncType} sync for {Count} mailbox mappings", syncType, mailboxMappings.Count);
 
         foreach (var mapping in mailboxMappings)
         {
+            var displayName = mapping.GetDisplayName();
             try
             {
-                await SyncMailboxAsync(mapping);
+                await SyncMailboxAsync(mapping, forceFullSync);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to sync mailbox {Source} -> {Destination}",
-                    mapping.SourceMailbox, mapping.DestinationMailbox);
-                _statusService.UpdateMailboxStatus(
-                    $"{mapping.SourceMailbox} → {mapping.DestinationMailbox}",
-                    0, 1, "Failed");
+                _logger.LogError(ex, "[{MappingName}] Failed to sync mailbox {Source} -> {Destination}",
+                    displayName, mapping.SourceMailbox, mapping.DestinationMailbox);
+                _statusService.UpdateMailboxStatus(displayName, 0, 1, "Failed");
             }
         }
 
         // Persist state after sync completes
         await PersistStateAsync();
 
-        _logger.LogInformation("Completed sync for all mailboxes");
+        stopwatch.Stop();
+        var elapsed = stopwatch.Elapsed;
+        var duration = elapsed.TotalHours >= 1
+            ? $"{elapsed.Hours}h{elapsed.Minutes}m{elapsed.Seconds}s"
+            : elapsed.TotalMinutes >= 1
+                ? $"{elapsed.Minutes}m{elapsed.Seconds}s"
+                : $"{elapsed.TotalSeconds:F1}s";
+        _logger.LogInformation("Completed {SyncType} sync for all mailboxes in {Duration}", syncType, duration);
         _statusService.EndSync();
     }
 
-    private async Task SyncMailboxAsync(MailboxMapping mapping)
+    private async Task SyncMailboxAsync(MailboxMapping mapping, bool forceUpdate = false)
     {
-        var sourceTypeLabel = mapping.SourceType == SourceType.ExchangeOnPremise ? "EWS" : "Graph";
-        var displayName = mapping.SourceMailbox == mapping.DestinationMailbox
-            ? $"{mapping.SourceMailbox} ({sourceTypeLabel})"
-            : $"{mapping.SourceMailbox} → {mapping.DestinationMailbox} ({sourceTypeLabel})";
+        var displayName = mapping.GetDisplayName();
 
         try
         {
-            _logger.LogInformation("Syncing mailbox: {Source} ({SourceType}) to {Destination}",
-                mapping.SourceMailbox, sourceTypeLabel, mapping.DestinationMailbox);
+            _logger.LogInformation("[{MappingName}] Starting sync: {Source} -> {Destination}",
+                displayName, mapping.SourceMailbox, mapping.DestinationMailbox);
             _statusService.UpdateMailboxStatus(displayName, 0, 0, "Syncing");
 
-            // Determine the date range to sync
-            var endDate = DateTime.UtcNow.AddDays(30); // Look ahead 30 days
-            var startDate = _lastSyncTimes.TryGetValue(mapping.SourceMailbox, out var lastSync)
-                ? lastSync.AddMinutes(-5) // Overlap by 5 minutes to catch updates
-                : DateTime.UtcNow.AddDays(-_settings.LookbackDays); // Initial sync
+            // Determine the date range to sync - always use full lookback/lookforward range
+            // This ensures we catch all items in the configured window regardless of sync type
+            var endDate = DateTime.UtcNow.AddDays(_settings.LookForwardDays);
+            var startDate = DateTime.UtcNow.AddDays(-_settings.LookbackDays);
 
             // Get calendar items from appropriate source based on SourceType
             List<CalendarItemSync> calendarItems;
@@ -129,7 +143,8 @@ public class CalendarSyncService : ICalendarSyncService
                 calendarItems = await _onlineSourceService.GetCalendarItemsAsync(
                     mapping.SourceMailbox,
                     startDate,
-                    endDate
+                    endDate,
+                    displayName
                 );
             }
             else
@@ -138,37 +153,166 @@ public class CalendarSyncService : ICalendarSyncService
                 calendarItems = await _onPremiseService.GetCalendarItemsAsync(
                     mapping.SourceMailbox,
                     startDate,
-                    endDate
+                    endDate,
+                    displayName
                 );
             }
 
-            if (!calendarItems.Any())
-            {
-                _logger.LogInformation("No calendar items to sync for {Source}", mapping.SourceMailbox);
-                _lastSyncTimes[mapping.SourceMailbox] = DateTime.UtcNow;
-                _statusService.UpdateMailboxStatus(displayName, 0, 0, "Completed");
-                return;
-            }
+            // Separate cancelled items from active items
+            var cancelledItems = calendarItems.Where(i => i.IsCancelled).ToList();
+            var activeItems = calendarItems.Where(i => !i.IsCancelled).ToList();
 
-            _logger.LogInformation("Found {Count} calendar items to sync for {Source}",
-                calendarItems.Count, mapping.SourceMailbox);
+            _logger.LogInformation("[{MappingName}] Found {ActiveCount} active and {CancelledCount} cancelled calendar items",
+                displayName, activeItems.Count, cancelledItems.Count);
 
-            // Sync each item to destination (one-way sync, no attachments)
-            var successCount = 0;
+            // Sync each active item to destination (one-way sync, no attachments)
+            var createdCount = 0;
+            var updatedCount = 0;
+            var noChangeCount = 0;
             var failureCount = 0;
 
-            foreach (var item in calendarItems)
+            foreach (var item in activeItems)
             {
                 try
                 {
-                    // Set the destination mailbox
+                    // Set the destination mailbox and mapping name for logging
                     item.DestinationMailbox = mapping.DestinationMailbox;
+                    item.MappingName = displayName;
 
                     // Note: Attachments are not included in CalendarItemSync model
                     // This ensures attachments are never synced
-                    var success = await _onlineService.SyncCalendarItemAsync(item);
+                    var result = await _onlineService.SyncCalendarItemAsync(item, forceUpdate);
 
-                    if (success)
+                    switch (result)
+                    {
+                        case SyncResult.Created:
+                            createdCount++;
+                            break;
+                        case SyncResult.Updated:
+                            updatedCount++;
+                            break;
+                        case SyncResult.NoChange:
+                            noChangeCount++;
+                            break;
+                        case SyncResult.Failed:
+                            failureCount++;
+                            break;
+                    }
+
+                    // Small delay to avoid throttling
+                    await Task.Delay(100);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[{MappingName}] Failed to sync item '{Subject}'",
+                        displayName, item.Subject);
+                    failureCount++;
+                }
+            }
+
+            // Delete cancelled items from destination
+            foreach (var cancelledItem in cancelledItems)
+            {
+                try
+                {
+                    _logger.LogInformation("[{MappingName}] Deleting cancelled item '{Subject}'",
+                        displayName, cancelledItem.Subject);
+
+                    var deleted = await _onlineService.DeleteCalendarItemAsync(
+                        mapping.DestinationMailbox,
+                        cancelledItem.Id,
+                        displayName);
+
+                    if (deleted)
+                    {
+                        updatedCount++; // Deletions count as updates
+                    }
+                    else
+                    {
+                        failureCount++;
+                    }
+
+                    await Task.Delay(100);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[{MappingName}] Failed to delete cancelled item '{Subject}'",
+                        displayName, cancelledItem.Subject);
+                    failureCount++;
+                }
+            }
+
+            // Handle deletions: find items in destination that no longer exist in source
+            var (deletionSuccesses, deletionFailures) = await SyncDeletionsAsync(mapping, startDate, endDate, activeItems);
+            updatedCount += deletionSuccesses; // Deletions count as updates
+            failureCount += deletionFailures;
+
+            var evaluatedCount = activeItems.Count + cancelledItems.Count;
+            _logger.LogInformation(
+                "[{MappingName}] Sync completed: {Evaluated} evaluated, {Created} created, {Updated} updated, {NoChange} unchanged, {Failures} failed",
+                displayName, evaluatedCount, createdCount, updatedCount, noChangeCount, failureCount);
+
+            // Update last sync time and status with detailed counts
+            _lastSyncTimes[mapping.SourceMailbox] = DateTime.UtcNow;
+            _statusService.UpdateMailboxStatus(displayName, evaluatedCount, createdCount, updatedCount, noChangeCount, failureCount,
+                failureCount > 0 ? "Completed with errors" : "Completed");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[{MappingName}] Failed to sync mailbox {Source} -> {Destination}",
+                displayName, mapping.SourceMailbox, mapping.DestinationMailbox);
+            _statusService.UpdateMailboxStatus(displayName, 0, 1, "Failed");
+            throw;
+        }
+    }
+
+    private async Task<(int successCount, int failureCount)> SyncDeletionsAsync(
+        MailboxMapping mapping,
+        DateTime startDate,
+        DateTime endDate,
+        List<CalendarItemSync> sourceItems)
+    {
+        var displayName = mapping.GetDisplayName();
+        var successCount = 0;
+        var failureCount = 0;
+
+        try
+        {
+            // Get all synced source IDs from the destination calendar
+            var destinationSourceIds = await _onlineService.GetSyncedSourceIdsAsync(
+                mapping.DestinationMailbox,
+                startDate,
+                endDate,
+                displayName);
+
+            if (!destinationSourceIds.Any())
+            {
+                return (successCount, failureCount);
+            }
+
+            // Find source IDs that exist in destination but not in source (deleted items)
+            var sourceItemIds = new HashSet<string>(sourceItems.Select(i => i.Id));
+            var deletedSourceIds = destinationSourceIds.Where(id => !sourceItemIds.Contains(id)).ToList();
+
+            if (!deletedSourceIds.Any())
+            {
+                _logger.LogDebug("[{MappingName}] No deleted items to remove", displayName);
+                return (successCount, failureCount);
+            }
+
+            _logger.LogInformation("[{MappingName}] Found {Count} items to delete (no longer exist in source)",
+                displayName, deletedSourceIds.Count);
+
+            foreach (var sourceId in deletedSourceIds)
+            {
+                try
+                {
+                    var deleted = await _onlineService.DeleteCalendarItemAsync(
+                        mapping.DestinationMailbox,
+                        sourceId,
+                        displayName);
+
+                    if (deleted)
                     {
                         successCount++;
                     }
@@ -177,32 +321,21 @@ public class CalendarSyncService : ICalendarSyncService
                         failureCount++;
                     }
 
-                    // Small delay to avoid throttling
                     await Task.Delay(100);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to sync item '{Subject}' for {Source}",
-                        item.Subject, mapping.SourceMailbox);
+                    _logger.LogError(ex, "[{MappingName}] Failed to delete orphaned item with source ID {SourceId}",
+                        displayName, sourceId);
                     failureCount++;
                 }
             }
-
-            _logger.LogInformation(
-                "Sync completed for {Source} -> {Destination}: {Success} succeeded, {Failures} failed",
-                mapping.SourceMailbox, mapping.DestinationMailbox, successCount, failureCount);
-
-            // Update last sync time and status
-            _lastSyncTimes[mapping.SourceMailbox] = DateTime.UtcNow;
-            _statusService.UpdateMailboxStatus(displayName, successCount, failureCount,
-                failureCount > 0 ? "Completed with errors" : "Completed");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to sync mailbox {Source} -> {Destination}",
-                mapping.SourceMailbox, mapping.DestinationMailbox);
-            _statusService.UpdateMailboxStatus(displayName, 0, 1, "Failed");
-            throw;
+            _logger.LogError(ex, "[{MappingName}] Failed to sync deletions", displayName);
         }
+
+        return (successCount, failureCount);
     }
 }

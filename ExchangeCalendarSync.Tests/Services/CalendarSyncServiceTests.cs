@@ -61,7 +61,7 @@ public class CalendarSyncServiceTests
         var mailboxes = new List<string> { "test@example.com" };
 
         _mockOnPremiseService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(new List<CalendarItemSync>());
 
         // Act
@@ -69,7 +69,7 @@ public class CalendarSyncServiceTests
 
         // Assert
         _mockOnPremiseService.Verify(
-            s => s.GetCalendarItemsAsync("test@example.com", It.IsAny<DateTime>(), It.IsAny<DateTime>()),
+            s => s.GetCalendarItemsAsync("test@example.com", It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()),
             Times.Once
         );
     }
@@ -99,7 +99,7 @@ public class CalendarSyncServiceTests
         };
 
         _mockOnPremiseService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(new List<CalendarItemSync>());
 
         // Act
@@ -107,7 +107,7 @@ public class CalendarSyncServiceTests
 
         // Assert
         _mockOnlineService.Verify(
-            s => s.SyncCalendarItemAsync(It.IsAny<CalendarItemSync>()),
+            s => s.SyncCalendarItemAsync(It.IsAny<CalendarItemSync>(), It.IsAny<bool>()),
             Times.Never
         );
     }
@@ -147,12 +147,12 @@ public class CalendarSyncServiceTests
         };
 
         _mockOnPremiseService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(calendarItems);
 
         _mockOnlineService
-            .Setup(s => s.SyncCalendarItemAsync(It.IsAny<CalendarItemSync>()))
-            .ReturnsAsync(true);
+            .Setup(s => s.SyncCalendarItemAsync(It.IsAny<CalendarItemSync>(), It.IsAny<bool>()))
+            .ReturnsAsync(SyncResult.Updated);
 
         // Act
         await service.SyncAllMailboxesAsync(mappings);
@@ -161,7 +161,7 @@ public class CalendarSyncServiceTests
         _mockOnlineService.Verify(
             s => s.SyncCalendarItemAsync(It.Is<CalendarItemSync>(item =>
                 item.DestinationMailbox == "test@cloud.com"
-            )),
+            ), It.IsAny<bool>()),
             Times.Once
         );
     }
@@ -191,7 +191,7 @@ public class CalendarSyncServiceTests
         };
 
         _mockOnlineSourceService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(new List<CalendarItemSync>());
 
         // Act
@@ -199,11 +199,11 @@ public class CalendarSyncServiceTests
 
         // Assert
         _mockOnlineSourceService.Verify(
-            s => s.GetCalendarItemsAsync("test@source.com", It.IsAny<DateTime>(), It.IsAny<DateTime>()),
+            s => s.GetCalendarItemsAsync("test@source.com", It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()),
             Times.Once
         );
         _mockOnPremiseService.Verify(
-            s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()),
+            s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()),
             Times.Never
         );
     }
@@ -233,7 +233,7 @@ public class CalendarSyncServiceTests
         };
 
         _mockOnPremiseService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(new List<CalendarItemSync>());
 
         // Act
@@ -270,7 +270,7 @@ public class CalendarSyncServiceTests
         };
 
         _mockOnPremiseService
-            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(s => s.GetCalendarItemsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
             .ReturnsAsync(new List<CalendarItemSync>());
 
         // Act

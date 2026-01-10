@@ -3,6 +3,7 @@ using ExchangeCalendarSync.Models;
 using ExchangeCalendarSync.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -15,12 +16,14 @@ public class SyncControllerTests
     private readonly Mock<ICalendarSyncService> _mockSyncService;
     private readonly SyncStatusService _statusService;
     private readonly ExchangeOnPremiseSettings _settings;
+    private readonly Mock<IHostApplicationLifetime> _mockApplicationLifetime;
 
     public SyncControllerTests()
     {
         _mockLogger = new Mock<ILogger<SyncController>>();
         _mockSyncService = new Mock<ICalendarSyncService>();
         _statusService = new SyncStatusService();
+        _mockApplicationLifetime = new Mock<IHostApplicationLifetime>();
 
         _settings = new ExchangeOnPremiseSettings
         {
@@ -36,7 +39,8 @@ public class SyncControllerTests
             _mockLogger.Object,
             _mockSyncService.Object,
             _statusService,
-            _settings);
+            _settings,
+            _mockApplicationLifetime.Object);
 
         // Act
         var result = controller.GetStatus();
@@ -55,7 +59,8 @@ public class SyncControllerTests
             _mockLogger.Object,
             _mockSyncService.Object,
             _statusService,
-            _settings);
+            _settings,
+            _mockApplicationLifetime.Object);
 
         _mockSyncService
             .Setup(s => s.SyncAllMailboxesAsync(It.IsAny<List<MailboxMapping>>()))
@@ -78,7 +83,8 @@ public class SyncControllerTests
             _mockLogger.Object,
             _mockSyncService.Object,
             _statusService,
-            _settings);
+            _settings,
+            _mockApplicationLifetime.Object);
 
         _statusService.StartSync(); // Mark as running
 
@@ -105,11 +111,12 @@ public class SyncControllerTests
             _mockLogger.Object,
             _mockSyncService.Object,
             _statusService,
-            _settings);
+            _settings,
+            _mockApplicationLifetime.Object);
 
         var syncExecuted = false;
         _mockSyncService
-            .Setup(s => s.SyncAllMailboxesAsync(It.IsAny<List<MailboxMapping>>()))
+            .Setup(s => s.SyncAllMailboxesAsync(It.IsAny<List<MailboxMapping>>(), It.IsAny<bool>()))
             .Callback(() => syncExecuted = true)
             .Returns(Task.CompletedTask);
 

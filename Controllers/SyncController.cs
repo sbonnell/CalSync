@@ -14,17 +14,20 @@ public class SyncController : ControllerBase
     private readonly ICalendarSyncService _syncService;
     private readonly ISyncStatusService _statusService;
     private readonly ExchangeOnPremiseSettings _settings;
+    private readonly IHostApplicationLifetime _applicationLifetime;
 
     public SyncController(
         ILogger<SyncController> logger,
         ICalendarSyncService syncService,
         ISyncStatusService statusService,
-        ExchangeOnPremiseSettings settings)
+        ExchangeOnPremiseSettings settings,
+        IHostApplicationLifetime applicationLifetime)
     {
         _logger = logger;
         _syncService = syncService;
         _statusService = statusService;
         _settings = settings;
+        _applicationLifetime = applicationLifetime;
     }
 
     [HttpGet("status")]
@@ -36,9 +39,10 @@ public class SyncController : ControllerBase
 
     [HttpPost("start")]
     [EnableRateLimiting("sync")]
-    public async Task<IActionResult> StartSync()
+    public async Task<IActionResult> StartSync([FromQuery] bool fullSync = false)
     {
-        _logger.LogInformation("Manual sync requested via API");
+        var syncType = fullSync ? "full" : "incremental";
+        _logger.LogInformation("Manual {SyncType} sync requested via API", syncType);
 
         // Check if a sync is already running
         if (_statusService.IsRunning())
@@ -59,11 +63,11 @@ public class SyncController : ControllerBase
             {
                 try
                 {
-                    await _syncService.SyncAllMailboxesAsync(_settings.GetMailboxMappings());
+                    await _syncService.SyncAllMailboxesAsync(_settings.GetMailboxMappings(), fullSync);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Manual sync failed");
+                    _logger.LogError(ex, "Manual {SyncType} sync failed", syncType);
                 }
                 finally
                 {
@@ -71,13 +75,38 @@ public class SyncController : ControllerBase
                 }
             });
 
-            return Ok(new { message = "Sync started successfully" });
+            return Ok(new { message = $"{(fullSync ? "Full" : "Incremental")} sync started successfully" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start manual sync");
+            _logger.LogError(ex, "Failed to start manual {SyncType} sync", syncType);
             _statusService.ReleaseSyncLock();
             return StatusCode(500, new { message = "Failed to start sync", error = ex.Message });
         }
+    }
+
+    [HttpPost("toggle")]
+    public IActionResult ToggleSync()
+    {
+        var currentState = _statusService.IsSyncEnabled();
+        var newState = !currentState;
+        _statusService.SetSyncEnabled(newState);
+        _logger.LogInformation("Sync scheduler {State} via API", newState ? "enabled" : "disabled");
+        return Ok(new { enabled = newState, message = newState ? "Sync scheduler enabled" : "Sync scheduler disabled" });
+    }
+
+    [HttpPost("restart")]
+    public IActionResult RestartApplication()
+    {
+        _logger.LogInformation("Application restart requested via API");
+
+        // Schedule the shutdown after a short delay to allow the response to be sent
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500);
+            _applicationLifetime.StopApplication();
+        });
+
+        return Ok(new { message = "Application is restarting..." });
     }
 }

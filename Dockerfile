@@ -26,15 +26,14 @@ COPY --from=build /app/publish .
 
 # Set environment variables
 ENV DOTNET_ENVIRONMENT=Production
-# Bind to localhost only - use reverse proxy for external access
-# Override with ASPNETCORE_URLS=http://+:5000 if needed for Docker networking
-ENV ASPNETCORE_URLS=http://127.0.0.1:5000
+# Bind to all interfaces for Docker networking - proxy handles API auth
+ENV ASPNETCORE_URLS=http://+:5000
 
-# Create directory for persistent state
-RUN mkdir -p /app/data
+# Create directories for persistent state and config
+RUN mkdir -p /app/data /app/config
 
 # Expose the web interface port
 EXPOSE 5000
 
-# Run the application
-ENTRYPOINT ["dotnet", "ExchangeCalendarSync.dll"]
+# Run the application with entrypoint that copies config if needed
+ENTRYPOINT ["/bin/sh", "-c", "[ -f /app/config/appsettings.json ] || cp /app/appsettings.json /app/config/appsettings.json; exec dotnet ExchangeCalendarSync.dll"]

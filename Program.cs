@@ -16,8 +16,18 @@ class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Configuration
-        builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        // Configuration - prefer config directory (for Docker volumes), fall back to app directory
+        var configPath = Path.Combine(Directory.GetCurrentDirectory(), "config", "appsettings.json");
+        var defaultPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+
+        if (File.Exists(configPath))
+        {
+            builder.Configuration.AddJsonFile(configPath, optional: false, reloadOnChange: true);
+        }
+        else
+        {
+            builder.Configuration.AddJsonFile(defaultPath, optional: false, reloadOnChange: true);
+        }
         builder.Configuration.AddEnvironmentVariables();
 
         var appSettings = new AppSettings();
@@ -51,6 +61,9 @@ class Program
 
         // Add background service for sync loop
         builder.Services.AddHostedService<SyncBackgroundService>();
+
+        // Add configuration watcher for auto-restart on settings changes
+        builder.Services.AddHostedService<ConfigurationWatcherService>();
 
         // Add global exception handler
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

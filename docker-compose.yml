@@ -10,7 +10,8 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./appsettings.json:/app/appsettings.json:ro
+      - appsettings-data:/app/config
+      - sync-data:/app/data
     env_file:
       - .env
     environment:
@@ -22,3 +23,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  appsettings-data:
+    driver: local
+  sync-data:
+    driver: local

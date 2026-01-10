@@ -18,4 +18,9 @@ public class CalendarItemSync
     public DateTime LastModified { get; set; }
     public string SourceMailbox { get; set; } = string.Empty;
     public string DestinationMailbox { get; set; } = string.Empty;
+    public bool IsCancelled { get; set; }
+    /// <summary>
+    /// The display name of the mapping this item belongs to, used for log filtering.
+    /// </summary>
+    public string MappingName { get; set; } = string.Empty;
 }

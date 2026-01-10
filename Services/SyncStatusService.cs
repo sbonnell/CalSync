@@ -28,6 +28,7 @@ public class SyncStatusService : ISyncStatusService
                 LastSyncTime = _status.LastSyncTime,
                 NextScheduledSync = _status.NextScheduledSync,
                 IsRunning = _status.IsRunning,
+                IsSyncEnabled = _status.IsSyncEnabled,
                 TotalItemsSynced = _status.TotalItemsSynced,
                 TotalErrors = _status.TotalErrors,
                 MailboxStatuses = new ConcurrentDictionary<string, MailboxSyncStatus>(_status.MailboxStatuses)
@@ -40,6 +41,22 @@ public class SyncStatusService : ISyncStatusService
         lock (_statusLock)
         {
             return _status.IsRunning;
+        }
+    }
+
+    public bool IsSyncEnabled()
+    {
+        lock (_statusLock)
+        {
+            return _status.IsSyncEnabled;
+        }
+    }
+
+    public void SetSyncEnabled(bool enabled)
+    {
+        lock (_statusLock)
+        {
+            _status.IsSyncEnabled = enabled;
         }
     }
 
@@ -87,6 +104,33 @@ public class SyncStatusService : ISyncStatusService
             mailboxStatus.Status = status;
 
             _status.TotalItemsSynced += itemsSynced;
+            _status.TotalErrors += errors;
+        }
+    }
+
+    public void UpdateMailboxStatus(string mailbox, int evaluated, int created, int updated, int unchanged, int errors, string status)
+    {
+        lock (_statusLock)
+        {
+            if (!_status.MailboxStatuses.ContainsKey(mailbox))
+            {
+                _status.MailboxStatuses[mailbox] = new MailboxSyncStatus
+                {
+                    MailboxEmail = mailbox
+                };
+            }
+
+            var mailboxStatus = _status.MailboxStatuses[mailbox];
+            mailboxStatus.LastSyncTime = DateTime.UtcNow;
+            mailboxStatus.ItemsEvaluated = evaluated;
+            mailboxStatus.ItemsCreated = created;
+            mailboxStatus.ItemsUpdated = updated;
+            mailboxStatus.ItemsUnchanged = unchanged;
+            mailboxStatus.ItemsSynced = created + updated + unchanged;
+            mailboxStatus.Errors = errors;
+            mailboxStatus.Status = status;
+
+            _status.TotalItemsSynced += created + updated + unchanged;
             _status.TotalErrors += errors;
         }
     }

@@ -30,13 +30,25 @@ public class SyncBackgroundService : BackgroundService
     {
         _logger.LogInformation("Sync background service starting...");
 
-        // Wait a bit for services to fully initialize
-        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        // Wait for the configured interval before starting the first sync
+        var nextSync = DateTime.UtcNow.AddMinutes(_syncSettings.SyncIntervalMinutes);
+        _statusService.SetNextScheduledSync(nextSync);
+        _logger.LogInformation("First sync scheduled in {Minutes} minutes", _syncSettings.SyncIntervalMinutes);
+        await Task.Delay(TimeSpan.FromMinutes(_syncSettings.SyncIntervalMinutes), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                // Check if sync is enabled
+                if (!_statusService.IsSyncEnabled())
+                {
+                    _logger.LogDebug("Sync scheduler is disabled, skipping scheduled sync");
+                    _statusService.SetNextScheduledSync(DateTime.MinValue); // Clear next sync time when disabled
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); // Check again in 10 seconds
+                    continue;
+                }
+
                 // Try to acquire the sync lock
                 if (await _statusService.TryAcquireSyncLock())
                 {
@@ -54,7 +66,7 @@ public class SyncBackgroundService : BackgroundService
                     _logger.LogInformation("Skipping scheduled sync - manual sync is running");
                 }
 
-                var nextSync = DateTime.UtcNow.AddMinutes(_syncSettings.SyncIntervalMinutes);
+                nextSync = DateTime.UtcNow.AddMinutes(_syncSettings.SyncIntervalMinutes);
                 _statusService.SetNextScheduledSync(nextSync);
 
                 _logger.LogInformation("Next sync in {Minutes} minutes", _syncSettings.SyncIntervalMinutes);

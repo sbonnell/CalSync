@@ -41,19 +41,20 @@ public class ExchangeOnPremiseService : ICalendarSourceService
         }
     }
 
-    public virtual Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
+    public virtual Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
     {
         if (_service == null)
         {
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
         }
 
+        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
         var items = new List<CalendarItemSync>();
 
         try
         {
-            _logger.LogInformation("Fetching calendar items for {Mailbox} from {Start} to {End}",
-                mailboxEmail, startDate, endDate);
+            _logger.LogInformation("{LogPrefix}Fetching calendar items for {Mailbox} from {Start} to {End}",
+                logPrefix, mailboxEmail, startDate, endDate);
 
             // Impersonate the mailbox
             _service.ImpersonatedUserId = new ImpersonatedUserId(ConnectingIdType.SmtpAddress, mailboxEmail);
@@ -111,15 +112,15 @@ public class ExchangeOnPremiseService : ICalendarSourceService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to process calendar item: {Subject}", appointment.Subject);
+                    _logger.LogWarning(ex, "{LogPrefix}Failed to process calendar item: {Subject}", logPrefix, appointment.Subject);
                 }
             }
 
-            _logger.LogInformation("Retrieved {Count} calendar items for {Mailbox}", items.Count, mailboxEmail);
+            _logger.LogInformation("{LogPrefix}Retrieved {Count} calendar items for {Mailbox}", logPrefix, items.Count, mailboxEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to fetch calendar items for {Mailbox}", mailboxEmail);
+            _logger.LogError(ex, "{LogPrefix}Failed to fetch calendar items for {Mailbox}", logPrefix, mailboxEmail);
             throw;
         }
 

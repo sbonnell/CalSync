@@ -6,6 +6,14 @@ public enum SourceType
     ExchangeOnline      // Exchange Online via Graph API
 }
 
+public enum SyncResult
+{
+    Created,    // New item was created
+    Updated,    // Existing item was updated
+    NoChange,   // Item exists but no changes detected
+    Failed      // Sync failed
+}
+
 public class AppSettings
 {
     public ExchangeOnPremiseSettings ExchangeOnPremise { get; set; } = new();
@@ -17,9 +25,27 @@ public class AppSettings
 
 public class MailboxMapping
 {
+    /// <summary>
+    /// Short friendly name for this mapping (e.g., "Alpha to Beta"). Used in logs and UI.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
     public string SourceMailbox { get; set; } = string.Empty;
     public string DestinationMailbox { get; set; } = string.Empty;
     public SourceType SourceType { get; set; } = SourceType.ExchangeOnPremise;
+
+    /// <summary>
+    /// Returns the display name, falling back to a generated name if not set.
+    /// </summary>
+    public string GetDisplayName()
+    {
+        if (!string.IsNullOrWhiteSpace(Name))
+            return Name;
+
+        // Generate a name from source/destination if not provided
+        var source = SourceMailbox.Split('@')[0];
+        var dest = DestinationMailbox.Split('@')[0];
+        return $"{source} -> {dest}";
+    }
 }
 
 public class ExchangeOnPremiseSettings
@@ -81,6 +107,7 @@ public class SyncSettings
 {
     public int SyncIntervalMinutes { get; set; } = 5;
     public int LookbackDays { get; set; } = 30;
+    public int LookForwardDays { get; set; } = 30;
 }
 
 public class PersistenceSettings

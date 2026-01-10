@@ -47,19 +47,20 @@ public class ExchangeOnlineSourceService : ICalendarSourceService
         }
     }
 
-    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate)
+    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
     {
         if (_graphClient == null)
         {
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
         }
 
+        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
         var items = new List<CalendarItemSync>();
 
         try
         {
-            _logger.LogInformation("Fetching calendar items for {Mailbox} from {Start} to {End}",
-                mailboxEmail, startDate, endDate);
+            _logger.LogInformation("{LogPrefix}Fetching calendar items for {Mailbox} from {Start} to {End}",
+                logPrefix, mailboxEmail, startDate, endDate);
 
             // Build the filter for date range
             var filter = $"start/dateTime ge '{startDate:yyyy-MM-ddTHH:mm:ss}' and end/dateTime le '{endDate:yyyy-MM-ddTHH:mm:ss}'";
@@ -75,7 +76,7 @@ public class ExchangeOnlineSourceService : ICalendarSourceService
 
             if (events?.Value == null || !events.Value.Any())
             {
-                _logger.LogInformation("No calendar items found for {Mailbox}", mailboxEmail);
+                _logger.LogInformation("{LogPrefix}No calendar items found for {Mailbox}", logPrefix, mailboxEmail);
                 return items;
             }
 
@@ -109,22 +110,23 @@ public class ExchangeOnlineSourceService : ICalendarSourceService
                         IsRecurring = evt.Recurrence != null,
                         RecurrencePattern = evt.Recurrence?.Pattern?.ToString(),
                         LastModified = evt.LastModifiedDateTime?.DateTime ?? DateTime.UtcNow,
-                        SourceMailbox = mailboxEmail
+                        SourceMailbox = mailboxEmail,
+                        IsCancelled = evt.IsCancelled ?? false
                     };
 
                     items.Add(item);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to process calendar item: {Subject}", evt.Subject);
+                    _logger.LogWarning(ex, "{LogPrefix}Failed to process calendar item: {Subject}", logPrefix, evt.Subject);
                 }
             }
 
-            _logger.LogInformation("Retrieved {Count} calendar items for {Mailbox}", items.Count, mailboxEmail);
+            _logger.LogInformation("{LogPrefix}Retrieved {Count} calendar items for {Mailbox}", logPrefix, items.Count, mailboxEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to fetch calendar items for {Mailbox}", mailboxEmail);
+            _logger.LogError(ex, "{LogPrefix}Failed to fetch calendar items for {Mailbox}", logPrefix, mailboxEmail);
             throw;
         }
 
