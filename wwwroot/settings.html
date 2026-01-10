@@ -167,6 +167,74 @@
                 </div>
             </div>
 
+            <!-- OpenTelemetry Settings -->
+            <div class="card">
+                <h2>OpenTelemetry Settings</h2>
+                <p class="section-description">Configure OpenTelemetry export for logs and metrics to an OTLP collector.</p>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="otelEnabled" name="otelEnabled">
+                        Enable OpenTelemetry Export
+                    </label>
+                </div>
+
+                <div id="otel-settings" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="otelEndpoint">OTLP Endpoint</label>
+                            <input type="text" id="otelEndpoint" name="otelEndpoint" placeholder="http://otel-collector:4317">
+                        </div>
+                        <div class="form-group">
+                            <label for="otelProtocol">Protocol</label>
+                            <select id="otelProtocol" name="otelProtocol">
+                                <option value="grpc">gRPC (port 4317)</option>
+                                <option value="http">HTTP/Protobuf (port 4318)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="otelServiceName">Service Name</label>
+                            <input type="text" id="otelServiceName" name="otelServiceName" placeholder="exchange-calendar-sync">
+                        </div>
+                        <div class="form-group">
+                            <label for="otelEnvironment">Environment</label>
+                            <input type="text" id="otelEnvironment" name="otelEnvironment" placeholder="production">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="otelExportLogs" name="otelExportLogs" checked>
+                                Export Logs
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="otelExportMetrics" name="otelExportMetrics" checked>
+                                Export Metrics
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="otelMetricsInterval">Metrics Interval (seconds)</label>
+                            <input type="number" id="otelMetricsInterval" name="otelMetricsInterval" min="10" max="300" value="60">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="otelHeaders">Authentication Headers (optional)</label>
+                        <div class="password-field">
+                            <input type="password" id="otelHeaders" name="otelHeaders" placeholder="api-key=xxx,x-custom=value (leave blank to keep existing)">
+                            <button type="button" class="password-toggle" onclick="togglePassword('otelHeaders')">Show</button>
+                        </div>
+                        <small style="color: #666; display: block; margin-top: 5px;">Comma-separated key=value pairs for OTLP authentication</small>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Buttons -->
             <div class="button-group">
                 <button type="submit" class="btn btn-primary">Save Settings</button>

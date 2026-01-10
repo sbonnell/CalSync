@@ -21,6 +21,7 @@ public class AppSettings
     public ExchangeOnlineSourceSettings? ExchangeOnlineSource { get; set; }
     public SyncSettings Sync { get; set; } = new();
     public PersistenceSettings Persistence { get; set; } = new();
+    public OpenTelemetrySettings OpenTelemetry { get; set; } = new();
 }
 
 public class MailboxMapping
@@ -114,4 +115,56 @@ public class PersistenceSettings
 {
     public string DataPath { get; set; } = "./data";
     public bool EnableStatePersistence { get; set; } = true;
+}
+
+public class OpenTelemetrySettings
+{
+    /// <summary>
+    /// Enable or disable OpenTelemetry export.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
+    /// OTLP base endpoint URL (e.g., http://otel-collector:4317 for gRPC or https://ingest.signoz.cloud:443 for HTTP).
+    /// For gRPC, this is used directly. For HTTP, /v1/logs and /v1/metrics paths are appended automatically.
+    /// </summary>
+    public string Endpoint { get; set; } = "http://localhost:4317";
+
+    /// <summary>
+    /// Service name for OTEL resource identification.
+    /// </summary>
+    public string ServiceName { get; set; } = "exchange-calendar-sync";
+
+    /// <summary>
+    /// Environment name (e.g., production, staging, development).
+    /// </summary>
+    public string Environment { get; set; } = "production";
+
+    /// <summary>
+    /// Enable logging export to OTLP.
+    /// </summary>
+    public bool ExportLogs { get; set; } = true;
+
+    /// <summary>
+    /// Enable metrics export to OTLP.
+    /// </summary>
+    public bool ExportMetrics { get; set; } = true;
+
+    /// <summary>
+    /// Protocol to use: "grpc" or "http" (HTTP/Protobuf).
+    /// The port should be specified in the Endpoint URL, not derived from protocol.
+    /// For SigNoz cloud (HTTPS on port 443), use Protocol="http" with Endpoint="https://ingest.{region}.signoz.cloud:443/v1/..."
+    /// </summary>
+    public string Protocol { get; set; } = "grpc";
+
+    /// <summary>
+    /// Headers for OTLP authentication (comma-separated key=value pairs).
+    /// Example: "api-key=xyz123,x-custom-header=value"
+    /// </summary>
+    public string? Headers { get; set; }
+
+    /// <summary>
+    /// Metrics export interval in seconds.
+    /// </summary>
+    public int MetricsExportIntervalSeconds { get; set; } = 60;
 }

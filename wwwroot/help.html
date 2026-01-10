@@ -35,6 +35,7 @@
                     <li><a href="#mailbox-mappings">Mailbox Mappings</a></li>
                     <li><a href="#sync-operations">Sync Operations</a></li>
                     <li><a href="#logs">Understanding Logs</a></li>
+                    <li><a href="#opentelemetry">OpenTelemetry</a></li>
                     <li><a href="#api">API Reference</a></li>
                     <li><a href="#troubleshooting">Troubleshooting</a></li>
                     <li><a href="#faq">FAQ</a></li>
@@ -316,9 +317,93 @@
             </ul>
         </div>
 
+        <div class="card" id="opentelemetry">
+            <h2>OpenTelemetry</h2>
+            <p>The application supports exporting logs and metrics to any OTLP-compatible backend such as SigNoz, Jaeger, Grafana, or a local OpenTelemetry Collector.</p>
+
+            <h3>Configuration Settings</h3>
+            <table>
+                <tr>
+                    <th>Setting</th>
+                    <th>Description</th>
+                    <th>Default</th>
+                </tr>
+                <tr>
+                    <td>Enabled</td>
+                    <td>Enable or disable OpenTelemetry export</td>
+                    <td><code>false</code></td>
+                </tr>
+                <tr>
+                    <td>Endpoint</td>
+                    <td>OTLP endpoint base URL (e.g., <code>http://localhost:4317</code>)</td>
+                    <td><code>http://localhost:4317</code></td>
+                </tr>
+                <tr>
+                    <td>Service Name</td>
+                    <td>Identifier for this service in your observability platform</td>
+                    <td><code>exchange-calendar-sync</code></td>
+                </tr>
+                <tr>
+                    <td>Environment</td>
+                    <td>Deployment environment (e.g., production, staging)</td>
+                    <td><code>production</code></td>
+                </tr>
+                <tr>
+                    <td>Export Logs</td>
+                    <td>Send logs to the OTLP endpoint</td>
+                    <td><code>true</code></td>
+                </tr>
+                <tr>
+                    <td>Export Metrics</td>
+                    <td>Send metrics to the OTLP endpoint</td>
+                    <td><code>true</code></td>
+                </tr>
+                <tr>
+                    <td>Protocol</td>
+                    <td><code>grpc</code> (port 4317) or <code>http</code> (port 4318/443)</td>
+                    <td><code>grpc</code></td>
+                </tr>
+                <tr>
+                    <td>Headers</td>
+                    <td>Authentication headers (comma-separated key=value pairs)</td>
+                    <td><em>empty</em></td>
+                </tr>
+                <tr>
+                    <td>Metrics Export Interval</td>
+                    <td>Seconds between metric exports</td>
+                    <td><code>60</code></td>
+                </tr>
+            </table>
+
+            <h3>Protocol Selection</h3>
+            <ul>
+                <li><strong>gRPC</strong>: Use <code>Protocol: grpc</code> with port 4317. The endpoint URL is used directly.</li>
+                <li><strong>HTTP/Protobuf</strong>: Use <code>Protocol: http</code> with port 4318 or 443. The paths <code>/v1/logs</code> and <code>/v1/metrics</code> are appended automatically.</li>
+            </ul>
+
+            <div class="tip">
+                <div class="tip-title">SigNoz Cloud Example</div>
+                <p>For SigNoz cloud, use these settings:</p>
+                <ul>
+                    <li><strong>Endpoint</strong>: <code>https://ingest.{region}.signoz.cloud:443</code></li>
+                    <li><strong>Protocol</strong>: <code>http</code></li>
+                    <li><strong>Headers</strong>: <code>signoz-access-token=YOUR_TOKEN</code></li>
+                </ul>
+            </div>
+
+            <h3>What Gets Exported</h3>
+            <p><strong>Logs</strong>: All application logs with structured attributes including severity level, service name, environment, and log parameters (e.g., MappingName, Source, Destination).</p>
+            <p><strong>Metrics</strong>: ASP.NET Core request metrics, HTTP client metrics, .NET runtime metrics (GC, memory, threads), and custom sync metrics.</p>
+        </div>
+
         <div class="card" id="api">
             <h2>API Reference</h2>
             <p>The application exposes REST API endpoints for integration and automation.</p>
+
+            <div class="warning">
+                <div class="warning-title">Security Note</div>
+                All <code>/api/*</code> endpoints are restricted to localhost access only. External requests will receive a 403 Forbidden response. The <code>/health</code> endpoint remains publicly accessible for container orchestration.
+            </div>
 
             <table>
                 <tr>

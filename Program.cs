@@ -7,6 +7,11 @@ using ExchangeCalendarSync.Models;
 using ExchangeCalendarSync.Services;
 using ExchangeCalendarSync.Logging;
 using ExchangeCalendarSync.Middleware;
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Exporter;
 
 namespace ExchangeCalendarSync;
 
@@ -40,7 +45,14 @@ class Program
             builder.Services.AddSingleton(appSettings.ExchangeOnlineSource);
         builder.Services.AddSingleton(appSettings.Sync);
         builder.Services.AddSingleton(appSettings.Persistence);
+        builder.Services.AddSingleton(appSettings.OpenTelemetry);
         builder.Services.AddSingleton(appSettings);
+
+        // Configure OpenTelemetry metrics if enabled
+        if (appSettings.OpenTelemetry.Enabled && appSettings.OpenTelemetry.ExportMetrics)
+        {
+            ConfigureOpenTelemetryMetrics(builder, appSettings.OpenTelemetry);
+        }
 
         // Register in-memory log provider
         var logProvider = new InMemoryLoggerProvider(maxLogCount: 1000);
@@ -50,6 +62,18 @@ class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.AddProvider(logProvider);
+
+        // Add OpenTelemetry logging exporter if enabled
+        if (appSettings.OpenTelemetry.Enabled && appSettings.OpenTelemetry.ExportLogs)
+        {
+            builder.Logging.AddOpenTelemetry(options =>
+            {
+                options.IncludeFormattedMessage = true;
+                options.IncludeScopes = true;
+                options.ParseStateValues = true;
+                ConfigureOtlpLogExporter(options, appSettings.OpenTelemetry);
+            });
+        }
 
         // Register services with interfaces
         builder.Services.AddSingleton<ExchangeOnPremiseService>();
@@ -149,6 +173,7 @@ class Program
         // Configure HTTP pipeline
         app.UseExceptionHandler();
         app.UseRateLimiter();
+        app.UseLocalhostOnlyApi(); // Restrict /api/* to localhost only
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.MapControllers();
@@ -234,5 +259,75 @@ class Program
                 hasOnPremiseSource ? "Exchange On-Premise (EWS)" : null,
                 hasOnlineSource ? "Exchange Online (Graph)" : null
             }.Where(s => s != null)));
+    }
+
+    static void ConfigureOpenTelemetryMetrics(WebApplicationBuilder builder, OpenTelemetrySettings settings)
+    {
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService(
+                serviceName: settings.ServiceName,
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
+            .AddAttributes(new[]
+            {
+                new KeyValuePair<string, object>("deployment.environment", settings.Environment)
+            });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .SetResourceBuilder(resourceBuilder)
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation()
+                    .AddMeter("ExchangeCalendarSync")
+                    .AddOtlpExporter(options =>
+                    {
+                        var isHttp = settings.Protocol.Equals("http", StringComparison.OrdinalIgnoreCase);
+                        options.Protocol = isHttp ? OtlpExportProtocol.HttpProtobuf : OtlpExportProtocol.Grpc;
+
+                        // For HTTP protocol, append /v1/metrics path; gRPC uses the base endpoint directly
+                        var endpoint = settings.Endpoint.TrimEnd('/');
+                        options.Endpoint = isHttp
+                            ? new Uri($"{endpoint}/v1/metrics")
+                            : new Uri(endpoint);
+
+                        if (!string.IsNullOrEmpty(settings.Headers))
+                        {
+                            options.Headers = settings.Headers;
+                        }
+                    });
+            });
+    }
+
+    static void ConfigureOtlpLogExporter(OpenTelemetryLoggerOptions options, OpenTelemetrySettings settings)
+    {
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService(
+                serviceName: settings.ServiceName,
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
+            .AddAttributes(new[]
+            {
+                new KeyValuePair<string, object>("deployment.environment", settings.Environment)
+            });
+
+        options.SetResourceBuilder(resourceBuilder);
+
+        options.AddOtlpExporter(exporterOptions =>
+        {
+            var isHttp = settings.Protocol.Equals("http", StringComparison.OrdinalIgnoreCase);
+            exporterOptions.Protocol = isHttp ? OtlpExportProtocol.HttpProtobuf : OtlpExportProtocol.Grpc;
+
+            // For HTTP protocol, append /v1/logs path; gRPC uses the base endpoint directly
+            var endpoint = settings.Endpoint.TrimEnd('/');
+            exporterOptions.Endpoint = isHttp
+                ? new Uri($"{endpoint}/v1/logs")
+                : new Uri(endpoint);
+
+            if (!string.IsNullOrEmpty(settings.Headers))
+            {
+                exporterOptions.Headers = settings.Headers;
+            }
+        });
     }
 }

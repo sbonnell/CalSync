@@ -45,6 +45,20 @@ async function loadSettings() {
         document.getElementById('dataPath').value = settings.persistence?.dataPath || './data';
         document.getElementById('enableStatePersistence').checked = settings.persistence?.enableStatePersistence ?? true;
 
+        // OpenTelemetry settings
+        document.getElementById('otelEnabled').checked = settings.openTelemetry?.enabled ?? false;
+        document.getElementById('otelEndpoint').value = settings.openTelemetry?.endpoint || 'http://localhost:4317';
+        document.getElementById('otelServiceName').value = settings.openTelemetry?.serviceName || 'exchange-calendar-sync';
+        document.getElementById('otelEnvironment').value = settings.openTelemetry?.environment || 'production';
+        document.getElementById('otelExportLogs').checked = settings.openTelemetry?.exportLogs ?? true;
+        document.getElementById('otelExportMetrics').checked = settings.openTelemetry?.exportMetrics ?? true;
+        document.getElementById('otelProtocol').value = settings.openTelemetry?.protocol || 'grpc';
+        // Display actual headers value from API
+        document.getElementById('otelHeaders').value = settings.openTelemetry?.headers || '';
+        document.getElementById('otelHeaders').placeholder = 'signoz-ingestion-key=xxx';
+        document.getElementById('otelMetricsInterval').value = settings.openTelemetry?.metricsExportIntervalSeconds || 60;
+        toggleOtelSettings();
+
         // Load mailbox mappings
         const container = document.getElementById('mappings-container');
         container.innerHTML = '';
@@ -184,6 +198,17 @@ async function saveSettings(e) {
             persistence: {
                 dataPath: document.getElementById('dataPath').value || './data',
                 enableStatePersistence: document.getElementById('enableStatePersistence').checked
+            },
+            openTelemetry: {
+                enabled: document.getElementById('otelEnabled').checked,
+                endpoint: document.getElementById('otelEndpoint').value || 'http://localhost:4317',
+                serviceName: document.getElementById('otelServiceName').value || 'exchange-calendar-sync',
+                environment: document.getElementById('otelEnvironment').value || 'production',
+                exportLogs: document.getElementById('otelExportLogs').checked,
+                exportMetrics: document.getElementById('otelExportMetrics').checked,
+                protocol: document.getElementById('otelProtocol').value || 'grpc',
+                headers: document.getElementById('otelHeaders').value || null,
+                metricsExportIntervalSeconds: parseInt(document.getElementById('otelMetricsInterval').value) || 60
             }
         };
 
@@ -213,10 +238,20 @@ async function saveSettings(e) {
 }
 
 /**
+ * Toggle OpenTelemetry settings visibility
+ */
+function toggleOtelSettings() {
+    const enabled = document.getElementById('otelEnabled').checked;
+    const settingsDiv = document.getElementById('otel-settings');
+    settingsDiv.style.display = enabled ? 'block' : 'none';
+}
+
+/**
  * Initialize the settings page
  */
 function initSettings() {
     document.getElementById('settings-form').addEventListener('submit', saveSettings);
+    document.getElementById('otelEnabled').addEventListener('change', toggleOtelSettings);
     loadSettings();
 }
 

@@ -311,8 +311,9 @@ dotnet test ExchangeCalendarSync.Tests/ExchangeCalendarSync.Tests.csproj
 - Credentials are stored in `appsettings.json` - consider using environment variables or secrets management in production
 - SSL certificate validation is bypassed for Exchange 2019 (update `ExchangeOnPremiseService.cs:28` for production)
 - Service runs with minimal permissions (no delete rights)
-- API rate limiting protects against abuse (100 requests per minute per endpoint)
+- API rate limiting protects against abuse (60 requests per minute per endpoint)
 - Passwords are never returned via the settings API (only accepted on write)
+- **API endpoints are localhost-only**: All `/api/*` endpoints can only be accessed from localhost (127.0.0.1/::1). External requests receive 403 Forbidden. The `/health` endpoint remains publicly accessible for container orchestration.
 
 ## State Persistence
 
@@ -362,6 +363,91 @@ Logs are written to the console and captured by Docker. Log levels can be config
   }
 }
 ```
+
+## OpenTelemetry
+
+The application supports exporting logs and metrics to any OTLP-compatible backend (e.g., SigNoz, Jaeger, Grafana, etc.).
+
+### Configuration
+
+```json
+{
+  "OpenTelemetry": {
+    "Enabled": true,
+    "Endpoint": "http://localhost:4317",
+    "ServiceName": "exchange-calendar-sync",
+    "Environment": "production",
+    "ExportLogs": true,
+    "ExportMetrics": true,
+    "Protocol": "grpc",
+    "Headers": "",
+    "MetricsExportIntervalSeconds": 60
+  }
+}
+```
+
+### Settings Reference
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `Enabled` | Enable/disable OpenTelemetry export | `false` |
+| `Endpoint` | OTLP endpoint base URL | `http://localhost:4317` |
+| `ServiceName` | Service name for resource identification | `exchange-calendar-sync` |
+| `Environment` | Deployment environment (e.g., production, staging) | `production` |
+| `ExportLogs` | Export logs to OTLP endpoint | `true` |
+| `ExportMetrics` | Export metrics to OTLP endpoint | `true` |
+| `Protocol` | Protocol to use: `grpc` or `http` (HTTP/Protobuf) | `grpc` |
+| `Headers` | Authentication headers (comma-separated key=value pairs) | `""` |
+| `MetricsExportIntervalSeconds` | How often to export metrics | `60` |
+
+### Protocol Selection
+
+- **gRPC** (`Protocol: "grpc"`): Use port 4317. The endpoint is used directly.
+- **HTTP/Protobuf** (`Protocol: "http"`): Use port 4318 or 443. Paths `/v1/logs` and `/v1/metrics` are appended automatically.
+
+### Example: SigNoz Cloud
+
+For SigNoz cloud, use HTTP protocol with HTTPS on port 443:
+
+```json
+{
+  "OpenTelemetry": {
+    "Enabled": true,
+    "Endpoint": "https://ingest.eu.signoz.cloud:443",
+    "ServiceName": "exchange-calendar-sync",
+    "Environment": "production",
+    "ExportLogs": true,
+    "ExportMetrics": true,
+    "Protocol": "http",
+    "Headers": "signoz-access-token=YOUR_SIGNOZ_TOKEN"
+  }
+}
+```
+
+### Example: Local OpenTelemetry Collector (gRPC)
+
+```json
+{
+  "OpenTelemetry": {
+    "Enabled": true,
+    "Endpoint": "http://otel-collector:4317",
+    "Protocol": "grpc"
+  }
+}
+```
+
+### Exported Data
+
+**Logs**: All application logs with structured attributes including:
+- Severity level (Information, Warning, Error, etc.)
+- Service name and environment
+- Structured log parameters (e.g., `MappingName`, `Source`, `Destination`)
+
+**Metrics**: Runtime and HTTP instrumentation including:
+- ASP.NET Core request metrics
+- HTTP client metrics
+- .NET runtime metrics (GC, memory, threads)
+- Custom `ExchangeCalendarSync` meter
 
 ## Troubleshooting
 
