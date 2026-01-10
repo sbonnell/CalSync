@@ -93,6 +93,9 @@ public class ExchangeOnlineSourceService : ICalendarSourceService
                         Id = evt.Id ?? string.Empty,
                         Subject = evt.Subject ?? string.Empty,
                         Body = evt.Body?.Content,
+                        BodyContentType = evt.Body?.ContentType == BodyType.Html
+                            ? Models.BodyContentType.Html
+                            : Models.BodyContentType.Text,
                         Start = evt.Start != null ? DateTime.Parse(evt.Start.DateTime) : DateTime.MinValue,
                         End = evt.End != null ? DateTime.Parse(evt.End.DateTime) : DateTime.MinValue,
                         Location = evt.Location?.DisplayName ?? string.Empty,
