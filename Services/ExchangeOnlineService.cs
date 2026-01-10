@@ -3,12 +3,21 @@ using Microsoft.Graph.Models;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
+using ExchangeCalendarSync.Utilities;
 using Azure.Identity;
 
 namespace ExchangeCalendarSync.Services;
 
 public class ExchangeOnlineService : ICalendarDestinationService
 {
+    // Extended property IDs for tracking source calendar items
+    private static class ExtendedPropertyIds
+    {
+        private const string PropertySetId = "00020329-0000-0000-C000-000000000046";
+        public static string SourceExchangeId => $"String {{{PropertySetId}}} Name SourceExchangeId";
+        public static string SourceLastModified => $"String {{{PropertySetId}}} Name SourceLastModified";
+    }
+
     private readonly ILogger<ExchangeOnlineService> _logger;
     private readonly ExchangeOnlineSettings _settings;
     private GraphServiceClient? _graphClient;
@@ -42,12 +51,15 @@ public class ExchangeOnlineService : ICalendarDestinationService
         }
     }
 
-    public virtual async Task<SyncResult> SyncCalendarItemAsync(CalendarItemSync item, bool forceUpdate = false)
+    private void EnsureInitialized()
     {
         if (_graphClient == null)
-        {
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
-        }
+    }
+
+    public virtual async Task<SyncResult> SyncCalendarItemAsync(CalendarItemSync item, bool forceUpdate = false)
+    {
+        EnsureInitialized();
 
         // Use DestinationMailbox if set, otherwise fall back to SourceMailbox for backward compatibility
         var targetMailbox = !string.IsNullOrEmpty(item.DestinationMailbox) ? item.DestinationMailbox : item.SourceMailbox;
@@ -111,12 +123,12 @@ public class ExchangeOnlineService : ICalendarDestinationService
                 {
                     new SingleValueLegacyExtendedProperty
                     {
-                        Id = "String {00020329-0000-0000-C000-000000000046} Name SourceExchangeId",
+                        Id = ExtendedPropertyIds.SourceExchangeId,
                         Value = item.Id
                     },
                     new SingleValueLegacyExtendedProperty
                     {
-                        Id = "String {00020329-0000-0000-C000-000000000046} Name SourceLastModified",
+                        Id = ExtendedPropertyIds.SourceLastModified,
                         Value = item.LastModified.ToUniversalTime().ToString("o")
                     }
                 }
@@ -163,7 +175,7 @@ public class ExchangeOnlineService : ICalendarDestinationService
             if (_graphClient == null) return (null, null);
 
             // Search for events with the matching source ID in extended properties
-            var filter = $"singleValueExtendedProperties/Any(ep: ep/id eq 'String {{00020329-0000-0000-C000-000000000046}} Name SourceExchangeId' and ep/value eq '{sourceId}')";
+            var filter = $"singleValueExtendedProperties/Any(ep: ep/id eq '{ExtendedPropertyIds.SourceExchangeId}' and ep/value eq '{sourceId}')";
 
             var events = await _graphClient.Users[userEmail]
                 .Events
@@ -174,7 +186,7 @@ public class ExchangeOnlineService : ICalendarDestinationService
                     // Expand to get both extended properties
                     requestConfiguration.QueryParameters.Expand = new[]
                     {
-                        "singleValueExtendedProperties($filter=id eq 'String {00020329-0000-0000-C000-000000000046} Name SourceExchangeId' or id eq 'String {00020329-0000-0000-C000-000000000046} Name SourceLastModified')"
+                        $"singleValueExtendedProperties($filter=id eq '{ExtendedPropertyIds.SourceExchangeId}' or id eq '{ExtendedPropertyIds.SourceLastModified}')"
                     };
                 });
 
@@ -202,12 +214,9 @@ public class ExchangeOnlineService : ICalendarDestinationService
 
     public async Task<bool> DeleteCalendarItemAsync(string destinationMailbox, string sourceId, string? mappingName = null)
     {
-        if (_graphClient == null)
-        {
-            throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
-        }
+        EnsureInitialized();
 
-        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
+        var logPrefix = mappingName.ToLogPrefix();
 
         try
         {
@@ -235,25 +244,22 @@ public class ExchangeOnlineService : ICalendarDestinationService
 
     public async Task<List<string>> GetSyncedSourceIdsAsync(string destinationMailbox, DateTime startDate, DateTime endDate, string? mappingName = null)
     {
-        if (_graphClient == null)
-        {
-            throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
-        }
+        EnsureInitialized();
 
-        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
+        var logPrefix = mappingName.ToLogPrefix();
         var sourceIds = new List<string>();
 
         try
         {
             // Get all events in the date range that have our SourceExchangeId extended property
-            var events = await _graphClient.Users[destinationMailbox]
+            var events = await _graphClient!.Users[destinationMailbox]
                 .CalendarView
                 .GetAsync(requestConfiguration =>
                 {
                     requestConfiguration.QueryParameters.StartDateTime = startDate.ToString("yyyy-MM-ddTHH:mm:ss");
                     requestConfiguration.QueryParameters.EndDateTime = endDate.ToString("yyyy-MM-ddTHH:mm:ss");
                     requestConfiguration.QueryParameters.Top = 1000;
-                    requestConfiguration.QueryParameters.Expand = new[] { "singleValueExtendedProperties($filter=id eq 'String {00020329-0000-0000-C000-000000000046} Name SourceExchangeId')" };
+                    requestConfiguration.QueryParameters.Expand = new[] { $"singleValueExtendedProperties($filter=id eq '{ExtendedPropertyIds.SourceExchangeId}')" };
                 });
 
             if (events?.Value != null)

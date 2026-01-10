@@ -188,6 +188,35 @@ class Program
         await app.RunAsync();
     }
 
+    static ResourceBuilder CreateOtelResourceBuilder(OpenTelemetrySettings settings)
+    {
+        return ResourceBuilder.CreateDefault()
+            .AddService(
+                serviceName: settings.ServiceName,
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
+            .AddAttributes(new[]
+            {
+                new KeyValuePair<string, object>("deployment.environment", settings.Environment)
+            });
+    }
+
+    static void ConfigureOtlpExporter(OtlpExporterOptions options, OpenTelemetrySettings settings, string httpPathSuffix)
+    {
+        var isHttp = settings.Protocol.Equals("http", StringComparison.OrdinalIgnoreCase);
+        options.Protocol = isHttp ? OtlpExportProtocol.HttpProtobuf : OtlpExportProtocol.Grpc;
+
+        // For HTTP protocol, append the path suffix; gRPC uses the base endpoint directly
+        var endpoint = settings.Endpoint.TrimEnd('/');
+        options.Endpoint = isHttp
+            ? new Uri($"{endpoint}/{httpPathSuffix}")
+            : new Uri(endpoint);
+
+        if (!string.IsNullOrEmpty(settings.Headers))
+        {
+            options.Headers = settings.Headers;
+        }
+    }
+
     static void ValidateConfiguration(AppSettings settings, ILogger logger)
     {
         var errors = new List<string>();
@@ -263,71 +292,22 @@ class Program
 
     static void ConfigureOpenTelemetryMetrics(WebApplicationBuilder builder, OpenTelemetrySettings settings)
     {
-        var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService(
-                serviceName: settings.ServiceName,
-                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
-            .AddAttributes(new[]
-            {
-                new KeyValuePair<string, object>("deployment.environment", settings.Environment)
-            });
-
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
                 metrics
-                    .SetResourceBuilder(resourceBuilder)
+                    .SetResourceBuilder(CreateOtelResourceBuilder(settings))
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
                     .AddMeter("ExchangeCalendarSync")
-                    .AddOtlpExporter(options =>
-                    {
-                        var isHttp = settings.Protocol.Equals("http", StringComparison.OrdinalIgnoreCase);
-                        options.Protocol = isHttp ? OtlpExportProtocol.HttpProtobuf : OtlpExportProtocol.Grpc;
-
-                        // For HTTP protocol, append /v1/metrics path; gRPC uses the base endpoint directly
-                        var endpoint = settings.Endpoint.TrimEnd('/');
-                        options.Endpoint = isHttp
-                            ? new Uri($"{endpoint}/v1/metrics")
-                            : new Uri(endpoint);
-
-                        if (!string.IsNullOrEmpty(settings.Headers))
-                        {
-                            options.Headers = settings.Headers;
-                        }
-                    });
+                    .AddOtlpExporter(options => ConfigureOtlpExporter(options, settings, "v1/metrics"));
             });
     }
 
     static void ConfigureOtlpLogExporter(OpenTelemetryLoggerOptions options, OpenTelemetrySettings settings)
     {
-        var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService(
-                serviceName: settings.ServiceName,
-                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
-            .AddAttributes(new[]
-            {
-                new KeyValuePair<string, object>("deployment.environment", settings.Environment)
-            });
-
-        options.SetResourceBuilder(resourceBuilder);
-
-        options.AddOtlpExporter(exporterOptions =>
-        {
-            var isHttp = settings.Protocol.Equals("http", StringComparison.OrdinalIgnoreCase);
-            exporterOptions.Protocol = isHttp ? OtlpExportProtocol.HttpProtobuf : OtlpExportProtocol.Grpc;
-
-            // For HTTP protocol, append /v1/logs path; gRPC uses the base endpoint directly
-            var endpoint = settings.Endpoint.TrimEnd('/');
-            exporterOptions.Endpoint = isHttp
-                ? new Uri($"{endpoint}/v1/logs")
-                : new Uri(endpoint);
-
-            if (!string.IsNullOrEmpty(settings.Headers))
-            {
-                exporterOptions.Headers = settings.Headers;
-            }
-        });
+        options.SetResourceBuilder(CreateOtelResourceBuilder(settings));
+        options.AddOtlpExporter(exporterOptions => ConfigureOtlpExporter(exporterOptions, settings, "v1/logs"));
     }
 }

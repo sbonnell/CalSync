@@ -1,6 +1,7 @@
 using Microsoft.Exchange.WebServices.Data;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
+using ExchangeCalendarSync.Utilities;
 
 namespace ExchangeCalendarSync.Services;
 
@@ -41,14 +42,17 @@ public class ExchangeOnPremiseService : ICalendarSourceService
         }
     }
 
-    public virtual Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
+    private void EnsureInitialized()
     {
         if (_service == null)
-        {
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
-        }
+    }
 
-        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
+    public virtual Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
+    {
+        EnsureInitialized();
+
+        var logPrefix = mappingName.ToLogPrefix();
         var items = new List<CalendarItemSync>();
 
         try

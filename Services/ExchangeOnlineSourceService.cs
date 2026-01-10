@@ -2,6 +2,7 @@ using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Extensions.Logging;
 using ExchangeCalendarSync.Models;
+using ExchangeCalendarSync.Utilities;
 using Azure.Identity;
 
 namespace ExchangeCalendarSync.Services;
@@ -47,14 +48,17 @@ public class ExchangeOnlineSourceService : ICalendarSourceService
         }
     }
 
-    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
+    private void EnsureInitialized()
     {
         if (_graphClient == null)
-        {
             throw new InvalidOperationException("Service not initialized. Call Initialize() first.");
-        }
+    }
 
-        var logPrefix = !string.IsNullOrEmpty(mappingName) ? $"[{mappingName}] " : "";
+    public virtual async Task<List<CalendarItemSync>> GetCalendarItemsAsync(string mailboxEmail, DateTime startDate, DateTime endDate, string? mappingName = null)
+    {
+        EnsureInitialized();
+
+        var logPrefix = mappingName.ToLogPrefix();
         var items = new List<CalendarItemSync>();
 
         try

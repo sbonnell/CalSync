@@ -14,7 +14,8 @@
       "Bash(dotnet test:*)",
       "Bash(docker-compose logs:*)",
       "Bash(docker-compose down:*)",
-      "Bash(docker-compose build:*)"
+      "Bash(docker-compose build:*)",
+      "Bash(dir:*)"
     ]
   }
 }
