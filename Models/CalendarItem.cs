@@ -1,10 +1,23 @@
 namespace ExchangeCalendarSync.Models;
 
+/// <summary>
+/// Indicates the content type of an event body.
+/// </summary>
+public enum BodyContentType
+{
+    Text,
+    Html
+}
+
 public class CalendarItemSync
 {
     public string Id { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string? Body { get; set; }
+    /// <summary>
+    /// The content type of the Body (Text or Html). Defaults to Text.
+    /// </summary>
+    public BodyContentType BodyContentType { get; set; } = BodyContentType.Text;
     public DateTime Start { get; set; }
     public DateTime End { get; set; }
     public string Location { get; set; } = string.Empty;

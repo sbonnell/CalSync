@@ -94,7 +94,7 @@ public class ExchangeOnlineService : ICalendarDestinationService
                 Subject = item.Subject,
                 Body = new ItemBody
                 {
-                    ContentType = BodyType.Text,
+                    ContentType = item.BodyContentType == Models.BodyContentType.Html ? BodyType.Html : BodyType.Text,
                     Content = item.Body ?? string.Empty
                 },
                 Start = new DateTimeTimeZone
